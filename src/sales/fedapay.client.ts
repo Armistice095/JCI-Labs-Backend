@@ -112,7 +112,9 @@ export class FedaPayClient {
         const text = await res.text();
         if (!res.ok) {
           const retryable = res.status >= 500 || res.status === 429;
-          throw new FedaPayError(`FedaPay ${method} ${path} → HTTP ${res.status}`, res.status, retryable);
+          // Le détail renvoyé par FedaPay (ex. « account not activated ») n'est écrit que dans les journaux, jamais renvoyé au client.
+          const detail = text.replace(/\s+/g, ' ').slice(0, 300);
+          throw new FedaPayError(`FedaPay ${method} ${path} → HTTP ${res.status}${detail ? ` : ${detail}` : ''}`, res.status, retryable);
         }
         try { return text ? JSON.parse(text) : {}; } catch { throw new FedaPayError('Réponse FedaPay illisible.'); }
       } catch (e) {

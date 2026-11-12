@@ -9,6 +9,7 @@ Format : le plus récent en premier. « Cassant » = nécessite une adaptation d
 
 **Modifié** :
 - **Correctif CORS** : les méthodes `PUT`, `PATCH` et `DELETE` sont maintenant autorisées (seules `GET`, `HEAD` et `POST` l'étaient : le navigateur bloquait la modification, la publication et la suppression depuis `admin.jcicomee.org`, avec « Connexion impossible » côté front).
+- Journaux : quand FedaPay refuse une requête, le début de sa réponse (300 caractères au plus) est ajouté à la ligne de journal, pour comprendre un 401/403/422. Rien n'est renvoyé au client.
 - CORS : l'en-tête `Retry-After` est maintenant exposé aux navigateurs (lisible sur les réponses `429`). Les origines autorisées restent celles de `CORS_ORIGINS`.
 
 **Configuration production** (aucun code) : `PUBLIC_WEB_URL=https://billets.jcicomee.org` (c'est aussi l'adresse de retour FedaPay et celle des QR codes), `ADMIN_WEB_URL=https://admin.jcicomee.org`, `CORS_ORIGINS` = les deux.
