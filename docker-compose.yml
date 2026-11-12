@@ -1,0 +1,26 @@
+# Déploiement sur VPS : API + worker (même image) + Caddy (HTTPS automatique). La base est chez Supabase.
+x-app: &app
+  build: .
+  restart: unless-stopped
+  env_file: .env
+
+services:
+  api:
+    <<: *app
+    environment: { PORT: "3000", PROCESS_ROLE: api }
+    expose: ["3000"]
+  worker:
+    <<: *app
+    command: ["node", "dist/worker.js"]
+    init: true            # récupère les processus Chromium terminés (évite les zombies)
+    environment: { PROCESS_ROLE: worker }
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on: [api]
+volumes:
+  caddy_data:

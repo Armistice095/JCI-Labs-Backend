@@ -1,0 +1,23 @@
+# Tout ce qui n'a pas à entrer dans l'image : plus petit, plus rapide à construire, aucun secret embarqué.
+node_modules
+dist
+coverage
+preview
+.git
+.github
+.env
+.env.*
+!.env.example
+*.log
+*.zip
+test
+docs
+*.md
+render.yaml
+docker-compose.yml
+Caddyfile
+jest.e2e.config.js
+redocly.yaml
+openapi.yaml
+.vscode
+.idea
