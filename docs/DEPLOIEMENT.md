@@ -68,7 +68,7 @@ Le dépôt peut être **privé** : Render s'y connecte via son application GitHu
 | `DATABASE_URL`, `DIRECT_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | étape 1 |
 | `PUBLIC_WEB_URL` | adresse de la page publique (ex. `https://billets.jcicomee.org`) ; **sans `/` final**. Elle est écrite dans les QR codes des billets. |
 | `ADMIN_WEB_URL` | adresse de l'administration (ex. `https://admin.jcicomee.org`) |
-| `CORS_ORIGINS` | les deux adresses ci-dessus, séparées par une virgule, sans espace. **Sans cela, les navigateurs bloquent les appels.** |
+| `CORS_ORIGINS` | les deux adresses ci-dessus, séparées par une virgule, sans espace. **Sans cela, les navigateurs bloquent les appels.** (L'en-tête `Retry-After` est exposé automatiquement.) |
 | `ORG_CONTACT_PHONE` | WhatsApp de la JCI, format international (`+229…`) |
 | `FEDAPAY_SECRET_KEY`, `FEDAPAY_WEBHOOK_SECRET` | FedaPay (sandbox) : voir [Paiements FedaPay](PAIEMENTS_FEDAPAY.md). Le secret du webhook n'existe qu'après l'étape 5 : mettre une valeur provisoire d'au moins 10 caractères, à corriger ensuite. |
 | `TURNSTILE_SECRET_KEY` | **En recette**, la clé de test de Cloudflare `1x0000000000000000000000000000000AA` (accepte tout). La page publique utilise alors la clé de site de test `1x00000000000000000000AA`. En production : vraies clés. |
@@ -132,3 +132,13 @@ Le dépôt peut être **privé** : Render s'y connecte via son application GitHu
 | Le webhook FedaPay répond 401 | `FEDAPAY_WEBHOOK_SECRET` ne correspond pas au secret du webhook | Recopier le secret de signature affiché par FedaPay |
 | Première requête très lente le matin | Service endormi (palier gratuit) | Normal ; voir « Garder le service éveillé » |
 | QR code des billets pointe vers `localhost` | `PUBLIC_WEB_URL` mal renseigné | Corriger (les billets déjà émis gardent l'ancienne adresse) |
+
+## Domaines de production (jcicomee.org)
+
+| Variable | Valeur |
+|---|---|
+| `PUBLIC_WEB_URL` | `https://billets.jcicomee.org` (adresse de retour FedaPay : `/commande/<réf>?token=…`) |
+| `ADMIN_WEB_URL` | `https://admin.jcicomee.org` |
+| `CORS_ORIGINS` | `https://billets.jcicomee.org,https://admin.jcicomee.org` |
+
+Pour une adresse `api.jcicomee.org` : ajouter le domaine personnalisé sur Render, puis créer l'enregistrement CNAME dans Cloudflare en **« DNS only »** (nuage gris) d'abord ; n'activer le proxy qu'une fois le certificat émis.

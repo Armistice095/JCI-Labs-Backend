@@ -7,6 +7,7 @@ import { ZodPipe } from '../common/zod.pipe';
 import { AdminOrdersService } from './admin-orders.service';
 import { OrdersService } from './orders.service';
 import { PhysicalSalesService } from './physical-sales.service';
+import { PublicEventsQuery, publicEventsQuery } from './public-events.schemas';
 import { PublicEventsService } from './public-events.service';
 import {
   cancelTicketBody, idempotencyKey, orderListQuery, OrderListQuery, physicalSaleCreate, PhysicalSaleCreate,
@@ -56,6 +57,13 @@ export class AdminSalesController {
 @Controller('public')
 export class PublicSalesController {
   constructor(private readonly events: PublicEventsService, private readonly orders: OrdersService) {}
+
+  @Public() @RateLimit('pub-events', 120, 60) @Get('events')
+  async list(@Query(new ZodPipe(publicEventsQuery)) q: PublicEventsQuery, @Res({ passthrough: true }) res: FastifyReply) {
+    const page = await this.events.list(q);
+    res.header('Cache-Control', 'public, max-age=0, s-maxage=60, stale-while-revalidate=60'); // même politique que la page d'un événement
+    return page;
+  }
 
   @Public() @RateLimit('pub-event', 120, 60) @Get('events/:slug')
   async event(@Param('slug') slug: string, @Res({ passthrough: true }) res: FastifyReply) {

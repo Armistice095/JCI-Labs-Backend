@@ -2,6 +2,18 @@
 
 Format : le plus récent en premier. « Cassant » = nécessite une adaptation des interfaces.
 
+## 0.10.0 — liste publique des événements, CORS de production
+
+**Nouvelle route** (54 au total) — *additif, rien ne casse* :
+- `GET /public/events?when=upcoming|past|all&page=&pageSize=` : événements publiés (cartes : `slug`, `title`, `category`, `accentColor`, dates, lieu, `coverUrl`, `salesStatus`, `priceFromXof`, `soldOut`, `updatedAt`), pour la page d'accueil de la billetterie et le `sitemap.xml`. Publique, 120 appels/min/IP, cache CDN 60 s.
+
+**Modifié** :
+- CORS : l'en-tête `Retry-After` est maintenant exposé aux navigateurs (lisible sur les réponses `429`). Les origines autorisées restent celles de `CORS_ORIGINS`.
+
+**Configuration production** (aucun code) : `PUBLIC_WEB_URL=https://billets.jcicomee.org` (c'est aussi l'adresse de retour FedaPay et celle des QR codes), `ADMIN_WEB_URL=https://admin.jcicomee.org`, `CORS_ORIGINS` = les deux.
+
+**Migration** : aucune.
+
 ## 0.9.0 — contrôle d'accès (application JCI Stafs)
 
 **Nouvelles routes** (53 au total) — *additif, rien ne casse* :

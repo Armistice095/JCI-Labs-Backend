@@ -1,6 +1,6 @@
 # JCI Comé Labs — Guide d'intégration frontend
 
-**API v0.9.0** · module Événements & Billetterie · à lire avec `openapi.yaml` (référence exacte) et `api.html` (même contenu, lisible dans un navigateur).
+**API v0.10.0** · module Événements & Billetterie · à lire avec `openapi.yaml` (référence exacte) et `api.html` (même contenu, lisible dans un navigateur).
 
 > **Ce que ce document garantit.** `openapi.yaml` ne décrit que ce qui est **déjà en place** côté backend (50 routes). Il est vérifié automatiquement : à chaque modification du backend, des tests comparent les vraies réponses au contrat (route, code HTTP, types, champs obligatoires, valeurs d'énumération, champs non documentés). Si vous constatez un écart, c'est un bug backend : signalez-le.
 
@@ -402,6 +402,25 @@ Un participant = un **billet**. Droit `participant.read` sur l'événement (404 
 
 ---
 
+### 7.9 bis Liste publique des événements (accueil de la billetterie, sitemap)
+
+`GET /public/events` : sans compte, **uniquement les événements `PUBLISHED`** (jamais brouillon, clôturé ni annulé).
+
+| Paramètre | Valeurs | Défaut |
+|---|---|---|
+| `when` | `upcoming` (pas encore terminés, du plus proche au plus lointain) · `past` (terminés, du plus récent) · `all` | `upcoming` |
+| `page`, `pageSize` | `pageSize` de 1 à 100 | 1, 20 |
+
+Chaque élément (carte) : `slug`, `title`, `category`, `accentColor`, `startsAt`, `endsAt`, `venueName`, `city`, `coverUrl` (couverture ou `null`), `salesStatus`, `priceFromXof` (plus petit prix des catégories actives, `null` si aucune), `soldOut` (toutes les catégories épuisées) et **`updatedAt`**.
+
+- **Page d'accueil** : `GET /public/events?when=upcoming`, lien vers `/evenements/{slug}`.
+- **`sitemap.xml`** : parcourir `when=all` avec `pageSize=100` jusqu'à `meta.totalPages`. `<loc>` = `${PUBLIC_WEB_URL}/evenements/{slug}`, `<lastmod>` = `updatedAt`. Générer le sitemap côté serveur et le mettre en cache (quelques minutes), pas à chaque requête de robot.
+- Cache CDN : `s-maxage=60` (jamais sur une erreur). Limite : 120 appels/min/IP (voir §7.9 : depuis un Worker Cloudflare, plusieurs visiteurs partagent les mêmes adresses de sortie, d'où l'intérêt du cache).
+
+**CORS.** L'API accepte les origines de `CORS_ORIGINS` (production : `https://billets.jcicomee.org`, `https://admin.jcicomee.org`) et expose l'en-tête `Retry-After` : le front peut le lire sur un `429` pour afficher « réessayez dans N secondes ».
+
+---
+
 ### 7.10 Tableau de bord
 
 `GET /dashboard?range=30` — une seule requête pour les cartes, la courbe, l'anneau et les événements proches. Les deux tableaux du bas ont leurs propres routes (ci-dessous). Réservé à `dashboard.view` (administrateur, président local, organisateur) : **403** pour un vendeur ou un agent d'accueil, dont le menu ne doit pas proposer l'écran. Il porte sur **les événements que l'utilisateur voit**, brouillons exclus : un organisateur ne voit que les siens.
@@ -487,5 +506,5 @@ Ces routes figuraient dans la première ébauche du contrat mais **ne sont pas e
 
 ## 11. Évolution du contrat
 
-- Version actuelle : **0.9.0** (voir `CHANGELOG.md`). Pendant la phase 0.x, des changements peuvent casser la compatibilité ; chacun est annoncé dans le changelog **avant** déploiement, avec la marche à suivre.
+- Version actuelle : **0.10.0** (voir `CHANGELOG.md`). Pendant la phase 0.x, des changements peuvent casser la compatibilité ; chacun est annoncé dans le changelog **avant** déploiement, avec la marche à suivre.
 - Les ajouts (nouvelle route, nouveau champ facultatif en lecture) ne cassent rien : les ignorer est sans risque. Programmez vos lectures de façon tolérante (ne pas échouer sur un champ inconnu ni sur une valeur d'énumération inconnue : prévoir un affichage par défaut).
