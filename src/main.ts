@@ -6,6 +6,7 @@ import helmet from '@fastify/helmet';
 import multipart from '@fastify/multipart';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/http-exception.filter';
+import { corsOptions } from './common/cors';
 import { loadEnv } from './config/env';
 
 async function bootstrap() {
@@ -19,10 +20,7 @@ async function bootstrap() {
   await app.register(multipart, { limits: { fileSize: 2 * 1024 * 1024, files: 1 } });
   app.setGlobalPrefix('api/v1');
   app.useGlobalFilters(new AllExceptionsFilter());
-  app.enableCors({
-    origin: env.CORS_ORIGINS ? env.CORS_ORIGINS.split(',').map((s) => s.trim()) : false,
-    credentials: true,
-  });
+  app.enableCors(corsOptions(env.CORS_ORIGINS));
   app.enableShutdownHooks();
   await app.listen(env.PORT, '0.0.0.0');
   new Logger('Bootstrap').log(`API prête sur le port ${env.PORT} (/api/v1)`);

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: JCI Comé Labs — API Événements & Billetterie
-  version: 0.9.0
+  version: 0.10.0
   description: |
     **Contrat v0.7.0 — uniquement ce qui est déjà en place côté backend** (50 routes). Les routes à venir sont listées
     dans `docs/GUIDE_FRONTEND.md` (section « Feuille de route »). Ce contrat est vérifié automatiquement contre les
@@ -681,6 +681,25 @@ paths:
         '429': { $ref: '#/components/responses/RateLimited' }
 
   # ═══════════════ Public ═══════════════
+  /public/events:
+    get:
+      tags: [Public]
+      summary: Liste des événements publiés (page d'accueil de la billetterie, sitemap.xml)
+      description: |
+        Sans compte. Seuls les événements **publiés** figurent dans la liste : brouillons, **clôturés** et **annulés** en sont exclus (leur page reste consultable par son adresse, `GET /public/events/{slug}`).
+        `when` : `upcoming` (par défaut : pas encore terminés, du plus proche au plus lointain), `past` (terminés, du plus récent au plus ancien) ou `all`. Un événement est « à venir » tant que sa fin (à défaut son début) n'est pas passée.
+        Pagination classique (`page`, `pageSize` de 1 à 100, 20 par défaut). Pour le **sitemap.xml**, parcourir les pages avec `when=all` jusqu'à `meta.totalPages`.
+        `updatedAt` = dernière modification de l'événement : à utiliser pour `<lastmod>`. `priceFromXof` = prix de la catégorie la moins chère (« À partir de 3 000 FCFA »), `null` s'il n'y en a pas ; `soldOut` = toutes les catégories sont épuisées.
+        Réponse mise en cache 60 s par un CDN (comme la page d'un événement). Limite : 120 requêtes par minute et par adresse IP (en-tête `Retry-After` sur la réponse 429).
+      parameters:
+        - { name: when, in: query, schema: { type: string, enum: [upcoming, past, all], default: upcoming } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/PublicEventList' } } } }
+        '422': { $ref: '#/components/responses/Validation' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
   /public/events/{slug}:
     get:
       tags: [Public]
@@ -1524,6 +1543,29 @@ components:
         availability: { $ref: '#/components/schemas/CategoryAvailability' }
         remaining: { type: integer, maximum: 10, description: Plafonné à 10 }
         maxPerOrder: { type: integer }
+    PublicEventCard:
+      type: object
+      required: [slug, title, category, accentColor, startsAt, endsAt, venueName, city, coverUrl, salesStatus, priceFromXof, soldOut, updatedAt]
+      properties:
+        slug: { type: string, description: "Adresse de la page : /evenements/{slug}" }
+        title: { type: string }
+        category: { $ref: '#/components/schemas/EventCategory' }
+        accentColor: { type: string, nullable: true }
+        startsAt: { type: string, format: date-time, nullable: true }
+        endsAt: { type: string, format: date-time, nullable: true }
+        venueName: { type: string, nullable: true }
+        city: { type: string, nullable: true }
+        coverUrl: { type: string, format: uri, nullable: true, description: "Affiche de couverture ; null si l'événement n'en a pas" }
+        salesStatus: { $ref: '#/components/schemas/SalesStatusOrNull' }
+        priceFromXof: { type: integer, nullable: true, description: "Prix de la catégorie active la moins chère" }
+        soldOut: { type: boolean, description: "Toutes les catégories actives sont épuisées" }
+        updatedAt: { type: string, format: date-time, description: "Dernière modification : <lastmod> du sitemap" }
+    PublicEventList:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/PublicEventCard' } }
+        meta: { $ref: '#/components/schemas/PageMeta' }
     PublicEvent:
       type: object
       required: [slug, title, category, accentColor, description, status, salesStatus, startsAt, endsAt, venueName, city, posters, programme, organizers, categories, maxPerOrder, contactEmail, contactPhone, practicalInfo, ticketTerms, refundPolicy, infoSources, faq, og]

@@ -199,7 +199,7 @@ Un rôle peut être global ou limité à un événement. La matrice complète de
 
 | Document | Pour qui | Contenu |
 |---|---|---|
-| [`openapi.yaml`](openapi.yaml) · [`docs/api.html`](docs/api.html) | Toutes les équipes | Contrat d'API (53 opérations), version navigable |
+| [`openapi.yaml`](openapi.yaml) · [`docs/api.html`](docs/api.html) | Toutes les équipes | Contrat d'API (54 opérations), version navigable |
 | [`docs/GUIDE_FRONTEND.md`](docs/GUIDE_FRONTEND.md) | Équipes front et mobile | Parcours, droits, erreurs, correspondance écran par écran |
 | [`docs/CHANGELOG.md`](docs/CHANGELOG.md) | Équipes front et mobile | Évolutions de l'API, changements cassants signalés |
 | [`docs/DEPLOIEMENT.md`](docs/DEPLOIEMENT.md) | Exploitation | Mise en ligne pas à pas, exploitation, passage en production |
@@ -222,7 +222,7 @@ Le palier gratuit **s'endort après 15 minutes** et dispose de **512 Mo** : adap
 | Pilotage | Participants et exports, vue d'ensemble, tableau de bord | Fait |
 | Page publique | Textes par défaut, FAQ, données de la page de vente | Fait (API) |
 | Contrôle d'accès | Scan atomique, compteurs (application JCI Stafs) | Fait (API) |
-| À venir | Admission exceptionnelle, onglets Présences, Communication et Documents, liste publique des événements pour le référencement (sitemap) | Prévu |
+| À venir | Admission exceptionnelle, onglets Présences, Communication et Documents | Prévu |
 
 ## Contribuer
 

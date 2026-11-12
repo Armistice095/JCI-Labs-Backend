@@ -1,6 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { ENV, Env } from '../config/env';
 import { notFound } from '../common/errors';
+import { pageMeta } from '../common/pagination';
+import { PublicEventsQuery } from './public-events.schemas';
 import { utcToLocalParts } from '../common/time';
 import { PrismaService } from '../prisma/prisma.service';
 import { posterUrl } from '../events/poster-url';
@@ -13,6 +16,37 @@ const STOCK_CAP = 10; // on n'expose pas le stock exact
 @Injectable()
 export class PublicEventsService {
   constructor(private readonly prisma: PrismaService, @Inject(ENV) private readonly env: Env, private readonly settings: SettingsService) {}
+
+  /**
+   * Événements publiés, pour la page d'accueil de la billetterie et le sitemap.xml. Brouillons, clôturés et annulés n'y figurent jamais
+   * (leur page reste consultable par son adresse). `updatedAt` = dernière modification de l'événement (balise `lastmod` du sitemap).
+   */
+  async list(q: PublicEventsQuery) {
+    const now = new Date();
+    const upcoming: Prisma.EventWhereInput = { OR: [{ endsAt: { gte: now } }, { endsAt: null, startsAt: { gte: now } }] };
+    const where: Prisma.EventWhereInput = { status: 'PUBLISHED', ...(q.when === 'upcoming' ? upcoming : q.when === 'past' ? { NOT: upcoming } : {}) };
+    const dir = q.when === 'upcoming' ? 'asc' : 'desc';
+    const [total, rows] = await Promise.all([
+      this.prisma.event.count({ where }),
+      this.prisma.event.findMany({
+        where, orderBy: [{ startsAt: dir }, { id: 'asc' }], skip: (q.page - 1) * q.pageSize, take: q.pageSize,
+        include: {
+          posters: { orderBy: [{ isCover: 'desc' }, { position: 'asc' }], take: 1 },
+          categories: { where: { isActive: true } },
+        },
+      }),
+    ]);
+    const data = rows.map((e) => ({
+      slug: e.slug, title: e.title, category: e.category, accentColor: e.accentColor,
+      startsAt: e.startsAt, endsAt: e.endsAt, venueName: e.venueName, city: e.city,
+      coverUrl: e.posters[0] ? posterUrl(this.env, e.posters[0].storagePath) : null,
+      salesStatus: computeSalesStatus(e, now),
+      priceFromXof: e.categories.length ? Math.min(...e.categories.map((c) => c.priceXof)) : null,
+      soldOut: e.categories.length > 0 && e.categories.every((c) => computeAvailability(c, e, now) === 'SOLD_OUT'),
+      updatedAt: e.updatedAt,
+    }));
+    return { data, meta: pageMeta(q.page, q.pageSize, total) };
+  }
 
   async getBySlug(slug: string) {
     const e = await this.prisma.event.findUnique({
