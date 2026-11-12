@@ -39,6 +39,17 @@ describe('CORS', () => {
     expect(String(r.headers['access-control-allow-headers']).toLowerCase()).toContain('idempotency-key');
   });
 
+  it('l’administration peut modifier, publier et supprimer : PATCH, PUT et DELETE autorisés (régression : seuls GET/HEAD/POST l’étaient)', async () => {
+    for (const method of ['PATCH', 'PUT', 'DELETE']) {
+      const r = await app.inject({
+        method: 'OPTIONS', url: '/ping',
+        headers: { origin: 'https://admin.jcicomee.org', 'access-control-request-method': method, 'access-control-request-headers': 'authorization,content-type' },
+      });
+      expect(r.statusCode).toBe(204);
+      expect(String(r.headers['access-control-allow-methods'])).toContain(method);
+    }
+  });
+
   it('refuse toute autre adresse (aucun en-tête CORS)', async () => {
     const r = await app.inject({ method: 'GET', url: '/ping', headers: { origin: 'https://pirate.example' } });
     expect(r.headers['access-control-allow-origin']).toBeUndefined();

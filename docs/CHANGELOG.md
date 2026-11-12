@@ -8,6 +8,7 @@ Format : le plus récent en premier. « Cassant » = nécessite une adaptation d
 - `GET /public/events?when=upcoming|past|all&page=&pageSize=` : événements publiés (cartes : `slug`, `title`, `category`, `accentColor`, dates, lieu, `coverUrl`, `salesStatus`, `priceFromXof`, `soldOut`, `updatedAt`), pour la page d'accueil de la billetterie et le `sitemap.xml`. Publique, 120 appels/min/IP, cache CDN 60 s.
 
 **Modifié** :
+- **Correctif CORS** : les méthodes `PUT`, `PATCH` et `DELETE` sont maintenant autorisées (seules `GET`, `HEAD` et `POST` l'étaient : le navigateur bloquait la modification, la publication et la suppression depuis `admin.jcicomee.org`, avec « Connexion impossible » côté front).
 - CORS : l'en-tête `Retry-After` est maintenant exposé aux navigateurs (lisible sur les réponses `429`). Les origines autorisées restent celles de `CORS_ORIGINS`.
 
 **Configuration production** (aucun code) : `PUBLIC_WEB_URL=https://billets.jcicomee.org` (c'est aussi l'adresse de retour FedaPay et celle des QR codes), `ADMIN_WEB_URL=https://admin.jcicomee.org`, `CORS_ORIGINS` = les deux.
