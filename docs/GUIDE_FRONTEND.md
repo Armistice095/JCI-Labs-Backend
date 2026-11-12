@@ -1,6 +1,6 @@
 # JCI Comé Labs — Guide d'intégration frontend
 
-**API v0.10.0** · module Événements & Billetterie · à lire avec `openapi.yaml` (référence exacte) et `api.html` (même contenu, lisible dans un navigateur).
+**API v0.11.0** · module Événements & Billetterie · à lire avec `openapi.yaml` (référence exacte) et `api.html` (même contenu, lisible dans un navigateur).
 
 > **Ce que ce document garantit.** `openapi.yaml` ne décrit que ce qui est **déjà en place** côté backend (50 routes). Il est vérifié automatiquement : à chaque modification du backend, des tests comparent les vraies réponses au contrat (route, code HTTP, types, champs obligatoires, valeurs d'énumération, champs non documentés). Si vous constatez un écart, c'est un bug backend : signalez-le.
 
@@ -386,8 +386,7 @@ Un participant = un **billet**. Droit `participant.read` sur l'événement (404 
 | Liste des billets : nom, prix, description | `categories[].name`, `priceXof`, `conditions` |
 | « Disponible » / « Plus que 12 places » / « Épuisé » | `categories[].availability` et `remaining` (**plafonné à 10** : afficher « Plus que N places » quand `remaining` ≤ 10 ; au-delà, « Disponible ») |
 | À propos · Programme · Organisé par | `description` · `programme[]` · `organizers[]` |
-| Sections repliables « Infos pratiques », « Conditions d'utilisation du billet », « Annulation et remboursement » | `practicalInfo`, `ticketTerms`, `refundPolicy` : **jamais `null`** côté public (texte de l'organisateur, sinon texte général JCI) ; `infoSources.<champ>` vaut `event` ou `default`. Toujours afficher les 3 sections |
-| Section « Questions fréquentes » (accordéon) | `faq[]` : `{question, answer}`, 6 questions (7 si une catégorie demande un justificatif). Valeurs réelles intégrées (délai de réservation, maximum par commande) |
+| **Une seule section « Questions fréquentes »** (accordéon) : plus de section « Informations » à part | `faq[]` : `{question, answer}`. Les **3 premiers éléments** sont « Infos pratiques », « Conditions d'utilisation du billet », « Annulation et remboursement » (texte de l'organisateur, sinon texte général JCI : jamais vides), suivis de 6 questions générales (7 si une catégorie demande un justificatif), avec les valeurs réelles (délai de réservation, maximum par commande). Afficher la liste telle quelle, dans l'ordre |
 | Bouton « Écrire sur WhatsApp » | `contactPhone` → `https://wa.me/<chiffres du numéro>` ; numéro de l'événement, sinon celui de l'organisation (`ORG_CONTACT_PHONE`) ; masquer le bouton seulement si `null` (aucun numéro configuré) |
 | Couleur propre à l'événement (facultatif) | `accentColor` (`#RRGGBB` ou `null` : couleur JCI par défaut) |
 | Aperçu WhatsApp / Facebook | `og.title`, `og.description`, `og.imageUrl` dans `<svelte:head>` |
@@ -506,5 +505,5 @@ Ces routes figuraient dans la première ébauche du contrat mais **ne sont pas e
 
 ## 11. Évolution du contrat
 
-- Version actuelle : **0.10.0** (voir `CHANGELOG.md`). Pendant la phase 0.x, des changements peuvent casser la compatibilité ; chacun est annoncé dans le changelog **avant** déploiement, avec la marche à suivre.
+- Version actuelle : **0.11.0** (voir `CHANGELOG.md`). Pendant la phase 0.x, des changements peuvent casser la compatibilité ; chacun est annoncé dans le changelog **avant** déploiement, avec la marche à suivre.
 - Les ajouts (nouvelle route, nouveau champ facultatif en lecture) ne cassent rien : les ignorer est sans risque. Programmez vos lectures de façon tolérante (ne pas échouer sur un champ inconnu ni sur une valeur d'énumération inconnue : prévoir un affichage par défaut).

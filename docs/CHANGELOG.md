@@ -2,6 +2,15 @@
 
 Format : le plus récent en premier. « Cassant » = nécessite une adaptation des interfaces.
 
+## 0.11.0 — une seule section « Questions fréquentes »
+
+**Comportement modifié** — *à adapter côté front* :
+- `GET /public/events/{slug}` : `faq[]` commence maintenant par **3 éléments** « Infos pratiques », « Conditions d'utilisation du billet », « Annulation et remboursement » (texte de l'organisateur, sinon texte JCI), suivis des questions générales (6, ou 7 avec justificatif). **Le front supprime la section « Informations » à part** et affiche uniquement `faq` en un seul accordéon.
+- `practicalInfo`, `ticketTerms`, `refundPolicy` et `infoSources` restent dans la réponse mais sont **dépréciés** (même contenu que les 3 premiers éléments de `faq`) : ne plus les afficher, sous peine de doublons. Ils seront retirés dans une version ultérieure, avec préavis ici.
+- L'administration (`GET/PATCH /events/{id}`) ne change pas : l'organisateur continue de rédiger ces trois textes dans la fiche événement.
+
+**Migration** : aucune.
+
 ## 0.10.0 — liste publique des événements, CORS de production
 
 **Nouvelle route** (54 au total) — *additif, rien ne casse* :

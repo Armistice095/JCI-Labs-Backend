@@ -118,7 +118,9 @@ d('Page publique d’un événement (e2e)', () => {
   it('FAQ : questions générales JCI avec les vraies valeurs (réservation, maximum par commande, justificatif seulement si une catégorie en demande)', async () => {
     const plain = json(await call('POST', '/events', admin, { ...complete, title: 'Faq simple', ticketing: { maxPerOrder: 3 }, publish: true }));
     const faq = Object.fromEntries(json(await call('GET', `/public/events/${plain.slug}`)).faq.map((f: any) => [f.question, f.answer]));
-    expect(Object.keys(faq)).toHaveLength(6);
+    expect(Object.keys(faq)).toHaveLength(9); // 3 rubriques d'information + 6 questions
+    expect(Object.keys(faq).slice(0, 3)).toEqual(['Infos pratiques', 'Conditions d’utilisation du billet', 'Annulation et remboursement']);
+    expect(faq['Infos pratiques']).toContain('au moins 30 minutes');
     expect(faq['Combien de temps ai-je pour payer ?']).toContain('réservées 15 minutes');
     expect(faq['Puis-je acheter plusieurs billets ?']).toBe('Oui, jusqu’à 3 par commande, avec le nom de chaque participant.');
 
@@ -127,8 +129,8 @@ d('Page publique d’un événement (e2e)', () => {
       categories: [{ name: 'Étudiant', priceXof: 1500, quota: 30, conditions: 'Justificatif demandé à l’entrée' }],
     }));
     const faq2 = json(await call('GET', `/public/events/${cond.slug}`)).faq;
-    expect(faq2).toHaveLength(7);
-    expect(faq2[6].question).toContain('justificatif');
+    expect(faq2).toHaveLength(10);
+    expect(faq2[9].question).toContain('justificatif');
   });
 
   it('contact : numéro de l’événement, sinon celui de l’organisation (variable ORG_CONTACT_PHONE)', async () => {

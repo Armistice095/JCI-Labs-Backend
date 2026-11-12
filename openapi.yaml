@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: JCI Comé Labs — API Événements & Billetterie
-  version: 0.10.0
+  version: 0.11.0
   description: |
     **Contrat v0.7.0 — uniquement ce qui est déjà en place côté backend** (50 routes). Les routes à venir sont listées
     dans `docs/GUIDE_FRONTEND.md` (section « Feuille de route »). Ce contrat est vérifié automatiquement contre les
@@ -1590,12 +1590,13 @@ components:
         maxPerOrder: { type: integer }
         contactEmail: { type: string, nullable: true }
         contactPhone: { type: string, nullable: true, description: "Numéro du bouton « Écrire sur WhatsApp » (lien `https://wa.me/<chiffres>`) : celui de l'événement, sinon celui de l'organisation ; `null` seulement si aucun n'est configuré (masquer alors le bouton)" }
-        practicalInfo: { type: string, description: "Section « Infos pratiques ». **Jamais vide** : texte de l'organisateur, sinon texte général JCI" }
-        ticketTerms: { type: string, description: "Section « Conditions d'utilisation du billet ». Jamais vide (texte de l'organisateur, sinon texte JCI)" }
-        refundPolicy: { type: string, description: "Section « Annulation et remboursement ». Jamais vide (texte de l'organisateur, sinon texte JCI)" }
+        practicalInfo: { type: string, deprecated: true, description: "**Déprécié** : déjà présent en tête de `faq`. Section « Infos pratiques ». Jamais vide : texte de l'organisateur, sinon texte général JCI" }
+        ticketTerms: { type: string, deprecated: true, description: "**Déprécié** : déjà présent dans `faq`. Section « Conditions d'utilisation du billet ». Jamais vide (texte de l'organisateur, sinon texte JCI)" }
+        refundPolicy: { type: string, deprecated: true, description: "**Déprécié** : déjà présent dans `faq`. Section « Annulation et remboursement ». Jamais vide (texte de l'organisateur, sinon texte JCI)" }
         infoSources:
           type: object
           required: [practicalInfo, ticketTerms, refundPolicy]
+          deprecated: true
           description: "D'où vient chaque texte : `event` (rédigé pour cet événement) ou `default` (texte général JCI)"
           properties:
             practicalInfo: { type: string, enum: [event, default] }
@@ -1603,7 +1604,7 @@ components:
             refundPolicy: { type: string, enum: [event, default] }
         faq:
           type: array
-          description: "Questions fréquentes générales JCI, adaptées à l'événement (durée de réservation, maximum de billets par commande, contact). À afficher en accordéon sous « Informations »."
+          description: "**Section unique « Questions fréquentes »**, à afficher en un seul accordéon. Elle commence par les trois rubriques d'information (« Infos pratiques », « Conditions d'utilisation du billet », « Annulation et remboursement » : texte de l'organisateur, sinon texte général JCI), suivies des questions générales JCI adaptées à l'événement (durée de réservation, maximum par commande, contact ; une question « justificatif » si une catégorie en demande). Il n'y a plus de section « Informations » à part."
           items:
             type: object
             required: [question, answer]

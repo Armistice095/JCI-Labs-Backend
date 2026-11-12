@@ -87,7 +87,13 @@ export class PublicEventsService {
       maxPerOrder: e.maxPerOrder, contactEmail: e.contactEmail, contactPhone,
       practicalInfo: practical.text, ticketTerms: terms.text, refundPolicy: refund.text,
       infoSources: { practicalInfo: practical.source, ticketTerms: terms.source, refundPolicy: refund.source },
-      faq: defaults.faq,
+      // Une seule section « Questions fréquentes » : les trois rubriques d'information en tête, puis les questions générales.
+      faq: [
+        { question: 'Infos pratiques', answer: practical.text },
+        { question: 'Conditions d’utilisation du billet', answer: terms.text },
+        { question: 'Annulation et remboursement', answer: refund.text },
+        ...defaults.faq,
+      ],
       og: {
         title: e.title,
         description: e.description.length > 200 ? `${e.description.slice(0, 197)}…` : e.description,
