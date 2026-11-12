@@ -1,0 +1,49 @@
+# Blueprint Render : déploiement de l'API JCI Labs (palier GRATUIT, pour la recette).
+# Mode d'emploi pas à pas : docs/DEPLOIEMENT.md
+#
+# Un seul service : l'API ET les tâches de fond (e-mails, billets, webhooks) tournent dans le même processus (PROCESS_ROLE=all).
+# Les valeurs « sync: false » sont demandées une seule fois dans le tableau de bord Render à la création du Blueprint
+# (jamais écrites dans le dépôt). Elles se modifient ensuite dans Render → Environment.
+services:
+  - type: web
+    name: jci-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free                 # 512 Mo, s'endort après 15 min sans trafic. À remplacer par un plan payant pour la vraie vente.
+    region: frankfurt          # la plus proche du Bénin ; ne peut plus être changée ensuite. Placer le projet Supabase dans la même région.
+    healthCheckPath: /api/v1/health
+    autoDeployTrigger: commit  # chaque push sur la branche liée redéploie
+    envVars:
+      # ── Fonctionnement ──
+      - { key: NODE_ENV, value: production }
+      - { key: PROCESS_ROLE, value: all }
+      - { key: NODE_OPTIONS, value: --max-old-space-size=256 }   # borne la mémoire de Node pour laisser de la place à Chromium
+      - { key: CHROMIUM_LOW_MEMORY, value: "true" }              # Chromium en un seul processus, éteint au repos (512 Mo). Mettre "false" dès que la mémoire dépasse 1 Go.
+      - { key: FEDAPAY_ENV, value: sandbox }                     # passer à « live » (avec les clés live) pour la vraie vente
+      - { key: POSTER_BUCKET, value: event-posters }
+      - { key: TICKETS_BUCKET, value: tickets }
+      - { key: BREVO_SENDER_NAME, value: JCI Comé Excellence }
+
+      # ── Base de données et authentification (Supabase) ──
+      # ATTENTION : Render n'a pas d'IPv6. Utiliser les adresses du POOLER (aws-…pooler.supabase.com), jamais db.xxxx.supabase.co.
+      - { key: DATABASE_URL, sync: false }                       # pooler mode « transaction » (port 6543)
+      - { key: DIRECT_URL, sync: false }                         # pooler mode « session » (port 5432), même hôte
+      - { key: SUPABASE_URL, sync: false }
+      - { key: SUPABASE_SERVICE_ROLE_KEY, sync: false }          # SECRET
+
+      # ── Adresses des applications ──
+      - { key: PUBLIC_WEB_URL, sync: false }                     # page publique de vente (ex. https://billets.jcicomee.org)
+      - { key: ADMIN_WEB_URL, sync: false }                      # administration (ex. https://admin.jcicomee.org)
+      - { key: CORS_ORIGINS, sync: false }                       # les deux adresses ci-dessus, séparées par une virgule
+      - { key: ORG_CONTACT_PHONE, sync: false }                  # WhatsApp de la JCI (+229…)
+
+      # ── Paiement ──
+      - { key: FEDAPAY_SECRET_KEY, sync: false }
+      - { key: FEDAPAY_WEBHOOK_SECRET, sync: false }
+
+      # ── Anti-robots et e-mails ──
+      - { key: TURNSTILE_SECRET_KEY, sync: false }               # en recette : clé de test Cloudflare (voir docs/DEPLOIEMENT.md)
+      - { key: BREVO_API_KEY, sync: false }
+      - { key: BREVO_SENDER_EMAIL, sync: false }                 # expéditeur vérifié dans Brevo
+      - { key: BREVO_WEBHOOK_TOKEN, generateValue: true }        # généré par Render ; à recopier dans le webhook Brevo (Render → Environment)

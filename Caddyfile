@@ -1,0 +1,5 @@
+# Remplacer par le vrai sous-domaine de l'API (ex. api.jcicomee.com)
+api.example.org {
+    encode gzip
+    reverse_proxy api:3000
+}

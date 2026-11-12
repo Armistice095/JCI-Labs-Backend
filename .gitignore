@@ -1,0 +1,22 @@
+# Dépendances et compilation
+node_modules/
+dist/
+coverage/
+
+# Secrets : JAMAIS dans le dépôt (seul .env.example est versionné)
+.env
+.env.*
+!.env.example
+
+# Fichiers générés ou locaux
+preview/
+*.log
+*.zip
+*.tsbuildinfo
+tmp/
+
+# Éditeurs et système
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
