@@ -2,6 +2,25 @@
 
 Format : le plus récent en premier. « Cassant » = nécessite une adaptation des interfaces.
 
+## 0.12.0 — documents PDF de l'événement (onglet « Documents »)
+
+**Nouvelles routes** (56 au total) — *additif, rien ne casse* :
+- `GET /events/{eventId}/reports` : catalogue des 4 documents (`kind`, `title`, `description`, `formats: ["pdf"]`, `available`). `available` est `false` pour un événement en brouillon ou si le rôle n'a pas le droit.
+- `GET /events/{eventId}/reports/{kind}` : télécharge le PDF. `kind` = `participants` (Liste des participants), `ticketing` (Rapport de billetterie), `attendance` (Liste des présences), `payments` (Journal des paiements). 20 appels/min/utilisateur, `Cache-Control: private, no-store`.
+- Droits : `participants` → `participant.export` ; `attendance` → `checkin.view` ; `ticketing` et `payments` → `finance.view` ou `order.read`. Chaque téléchargement est tracé (`report.export`).
+- Erreurs : 401, 403, 404, 409 (événement en brouillon), 422 (kind inconnu, ou plus de 3 000 lignes), 429.
+
+**Notes d'exploitation** : aucune migration. Les PDF sont produits par le Chromium déjà utilisé pour les billets (Chrome ≥ 131 requis pour les en-têtes et pieds de page) ; polices Poppins ajoutées dans `assets/fonts/`. Sur Render gratuit, le premier PDF après une mise en veille peut prendre quelques secondes de plus.
+
+## 0.11.0 — une seule section « Questions fréquentes »
+
+**Comportement modifié** — *à adapter côté front* :
+- `GET /public/events/{slug}` : `faq[]` commence maintenant par **3 éléments** « Infos pratiques », « Conditions d'utilisation du billet », « Annulation et remboursement » (texte de l'organisateur, sinon texte JCI), suivis des questions générales (6, ou 7 avec justificatif). **Le front supprime la section « Informations » à part** et affiche uniquement `faq` en un seul accordéon.
+- `practicalInfo`, `ticketTerms`, `refundPolicy` et `infoSources` restent dans la réponse mais sont **dépréciés** (même contenu que les 3 premiers éléments de `faq`) : ne plus les afficher, sous peine de doublons. Ils seront retirés dans une version ultérieure, avec préavis ici.
+- L'administration (`GET/PATCH /events/{id}`) ne change pas : l'organisateur continue de rédiger ces trois textes dans la fiche événement.
+
+**Migration** : aucune.
+
 ## 0.10.0 — liste publique des événements, CORS de production
 
 **Nouvelle route** (54 au total) — *additif, rien ne casse* :
@@ -9,6 +28,7 @@ Format : le plus récent en premier. « Cassant » = nécessite une adaptation d
 
 **Modifié** :
 - **Correctif CORS** : les méthodes `PUT`, `PATCH` et `DELETE` sont maintenant autorisées (seules `GET`, `HEAD` et `POST` l'étaient : le navigateur bloquait la modification, la publication et la suppression depuis `admin.jcicomee.org`, avec « Connexion impossible » côté front).
+- Journaux : quand FedaPay refuse une requête, le début de sa réponse (300 caractères au plus) est ajouté à la ligne de journal, pour comprendre un 401/403/422. Rien n'est renvoyé au client.
 - CORS : l'en-tête `Retry-After` est maintenant exposé aux navigateurs (lisible sur les réponses `429`). Les origines autorisées restent celles de `CORS_ORIGINS`.
 
 **Configuration production** (aucun code) : `PUBLIC_WEB_URL=https://billets.jcicomee.org` (c'est aussi l'adresse de retour FedaPay et celle des QR codes), `ADMIN_WEB_URL=https://admin.jcicomee.org`, `CORS_ORIGINS` = les deux.

@@ -101,6 +101,14 @@ export class ChromiumRenderer {
     });
   }
 
+  /**
+   * Rapport PDF au format A4 : la mise en page (couverture sans marges, en-têtes, pieds de page, numéros de page) est décrite par le CSS du document (@page).
+   * Même garde-fous que les billets : aucun script, aucune requête réseau.
+   */
+  async renderPdf(html: string): Promise<Buffer> {
+    return this.withPage(794, 1123, 1, html, async (page) => Buffer.from(await page.pdf({ preferCSSPageSize: true, printBackground: true, timeout: 120_000 })));
+  }
+
   /** Visuel de partage (1080 × 1920) en JPEG : léger, accepté partout (statut WhatsApp, Facebook). */
   async renderShare(html: string): Promise<Buffer> {
     return this.withPage(SHARE_W, SHARE_H, 1, html, async (page) =>

@@ -1,6 +1,6 @@
 # JCI Comé Labs — Guide d'intégration frontend
 
-**API v0.10.0** · module Événements & Billetterie · à lire avec `openapi.yaml` (référence exacte) et `api.html` (même contenu, lisible dans un navigateur).
+**API v0.12.0** · module Événements & Billetterie · à lire avec `openapi.yaml` (référence exacte) et `api.html` (même contenu, lisible dans un navigateur).
 
 > **Ce que ce document garantit.** `openapi.yaml` ne décrit que ce qui est **déjà en place** côté backend (50 routes). Il est vérifié automatiquement : à chaque modification du backend, des tests comparent les vraies réponses au contrat (route, code HTTP, types, champs obligatoires, valeurs d'énumération, champs non documentés). Si vous constatez un écart, c'est un bug backend : signalez-le.
 
@@ -199,7 +199,8 @@ Le statut **de publication** (`EventStatus`) et le statut **de billetterie** (`S
 | Fiche — **Billetterie** | `GET /events/{id}/ticketing` ; `PATCH` ; `…/close` ; `…/reopen` ; catégories : `POST/PATCH/DELETE /categories` | ✅ |
 | Fiche — **Participants** (liste, filtres, exports, « Voir le billet ») | `GET /events/{id}/participants` (+ `/export`), `GET /tickets/{id}`, fichiers : `GET /tickets/{id}/files/{kind}` (§7.7) | ✅ |
 | Fiche — **Paiements** (compteurs, recherche) | `GET /events/{id}/orders` (`status`, `q`) ; détail `GET /orders/{id}` | ✅ |
-| Fiche — **Présences**, **Communication**, **Documents** (exports) | `…/attendance`, `…/communication`, `…/exports` | ⏳ |
+| Fiche — **Documents** (4 PDF) | `GET /events/{id}/reports`, `GET /events/{id}/reports/{kind}` (§7.12) | ✅ |
+| Fiche — **Présences**, **Communication** | `…/attendance`, `…/communication` | ⏳ |
 | **Création d'événement** | `POST /events` (voir §7.2) | ✅ |
 | **Vente physique** | `POST /physical-sales` (voir §7.3) | ✅ |
 | **Annuler un billet** | `POST /tickets/{id}/cancel` | ✅ |
@@ -348,7 +349,7 @@ Un participant = un **billet**. Droit `participant.read` sur l'événement (404 
 
 **Voir le billet** : `GET /tickets/{ticketId}` → titulaire, catégorie, présence (qui a scanné, quand), commande et paiement, historique des e-mails, `filesReady`. Les fichiers (PDF, image) se téléchargent ensuite avec `GET /tickets/{ticketId}/files/{kind}` (§7.6). Un vendeur peut ouvrir la fiche des billets **qu'il a lui-même vendus**.
 
-**Exporter** : `GET /events/{id}/participants/export?format=csv|xlsx` + les mêmes filtres (sans pagination). Droit `participant.export`. La réponse est le **fichier** : `fetch` avec l'en-tête `Authorization`, puis `blob()` et téléchargement (un lien `<a href>` ne transmet pas le jeton). Maximum 10 000 lignes (422 au-delà). Le CSV s'ouvre directement dans Excel en français (UTF-8, séparateur `;`). Le **PDF** n'est pas encore disponible (étape « Documents »).
+**Exporter** : `GET /events/{id}/participants/export?format=csv|xlsx` + les mêmes filtres (sans pagination). Droit `participant.export`. La réponse est le **fichier** : `fetch` avec l'en-tête `Authorization`, puis `blob()` et téléchargement (un lien `<a href>` ne transmet pas le jeton). Maximum 10 000 lignes (422 au-delà). Le CSV s'ouvre directement dans Excel en français (UTF-8, séparateur `;`). La **liste en PDF** se télécharge depuis l'onglet Documents (§7.12).
 
 ### 7.8 Vue d'ensemble (onglet de la fiche événement)
 
@@ -386,8 +387,7 @@ Un participant = un **billet**. Droit `participant.read` sur l'événement (404 
 | Liste des billets : nom, prix, description | `categories[].name`, `priceXof`, `conditions` |
 | « Disponible » / « Plus que 12 places » / « Épuisé » | `categories[].availability` et `remaining` (**plafonné à 10** : afficher « Plus que N places » quand `remaining` ≤ 10 ; au-delà, « Disponible ») |
 | À propos · Programme · Organisé par | `description` · `programme[]` · `organizers[]` |
-| Sections repliables « Infos pratiques », « Conditions d'utilisation du billet », « Annulation et remboursement » | `practicalInfo`, `ticketTerms`, `refundPolicy` : **jamais `null`** côté public (texte de l'organisateur, sinon texte général JCI) ; `infoSources.<champ>` vaut `event` ou `default`. Toujours afficher les 3 sections |
-| Section « Questions fréquentes » (accordéon) | `faq[]` : `{question, answer}`, 6 questions (7 si une catégorie demande un justificatif). Valeurs réelles intégrées (délai de réservation, maximum par commande) |
+| **Une seule section « Questions fréquentes »** (accordéon) : plus de section « Informations » à part | `faq[]` : `{question, answer}`. Les **3 premiers éléments** sont « Infos pratiques », « Conditions d'utilisation du billet », « Annulation et remboursement » (texte de l'organisateur, sinon texte général JCI : jamais vides), suivis de 6 questions générales (7 si une catégorie demande un justificatif), avec les valeurs réelles (délai de réservation, maximum par commande). Afficher la liste telle quelle, dans l'ordre |
 | Bouton « Écrire sur WhatsApp » | `contactPhone` → `https://wa.me/<chiffres du numéro>` ; numéro de l'événement, sinon celui de l'organisation (`ORG_CONTACT_PHONE`) ; masquer le bouton seulement si `null` (aucun numéro configuré) |
 | Couleur propre à l'événement (facultatif) | `accentColor` (`#RRGGBB` ou `null` : couleur JCI par défaut) |
 | Aperçu WhatsApp / Facebook | `og.title`, `og.description`, `og.imageUrl` dans `<svelte:head>` |
@@ -460,6 +460,32 @@ Deux routes, utilisées par l'application mobile de l'accueil (détail et exempl
 
 ---
 
+### 7.12 Documents de l'événement (onglet « Documents »)
+
+Quatre PDF, au design de l'association, générés à la demande (aucun stockage). Remplace le texte « arrivent avec une prochaine version ».
+
+1. **Afficher les cartes** : `GET /events/{id}/reports` → `data[]` (`kind`, `title`, `description`, `available`). Griser la carte si `available: false` (événement en brouillon ou droit manquant).
+2. **Télécharger** : `GET /events/{id}/reports/{kind}` avec le jeton d'accès. Le navigateur ne peut pas ajouter l'en-tête `Authorization` à un simple lien : utiliser `fetch`, puis un blob.
+
+```ts
+const res = await fetch(`${API}/events/${id}/reports/${kind}`, { headers: { Authorization: `Bearer ${token}` } });
+if (!res.ok) throw await res.json();               // { code, message }
+const name = /filename="?([^";]+)/.exec(res.headers.get('Content-Disposition') ?? '')?.[1] ?? `${kind}.pdf`;
+const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(await res.blob()), download: name });
+a.click(); URL.revokeObjectURL(a.href);
+```
+
+| `kind` | Document | Droit requis | Fichier |
+|---|---|---|---|
+| `participants` | Liste des participants | `participant.export` | `liste-participants-<slug>-AAAAMMJJ.pdf` |
+| `ticketing` | Rapport de billetterie | `finance.view` ou `order.read` | `rapport-billetterie-…` |
+| `attendance` | Liste des présences | `checkin.view` | `liste-presences-…` |
+| `payments` | Journal des paiements | `finance.view` ou `order.read` | `journal-paiements-…` |
+
+**Erreurs** : 403 (droit manquant), 404, 409 (brouillon : rien à rapporter), 422 (plus de 3 000 lignes : message explicite), 429 (20/min, lire `Retry-After`). Prévoir un indicateur de chargement : la génération prend 2 à 6 s (davantage après une mise en veille du serveur).
+
+**À savoir** : « billets vendus » compte tous les billets émis ; les billets annulés ou remboursés libèrent leur place et sont comptés à part ; les dates sont en heure du Bénin.
+
 ## 8. Sécurité côté interface
 
 - Aucune clé secrète dans le code client. Seuls l'URL Supabase et la clé **anon** sont publiques.
@@ -479,7 +505,7 @@ Ces routes figuraient dans la première ébauche du contrat mais **ne sont pas e
 |---|---|---|
 | Contrôle d'accès : admission exceptionnelle (`checkin.override`) | `POST /checkin/admit` | 6 |
 | Présences | `GET /events/{id}/attendance` | 6 |
-| Exports PDF / CSV / Excel (onglet Documents) | `POST /events/{id}/exports`, `GET /exports/{id}` | 6 |
+| Exports Excel / CSV d'autres listes (le PDF est livré, §7.12) | `POST /events/{id}/exports`, `GET /exports/{id}` | 6 |
 | Communication | `GET /events/{id}/communication` | 6 |
 
 **Ne recalculez jamais** les KPI côté client à partir des listes (risque d'écarts) : tous les chiffres du tableau de bord viennent de `GET /dashboard`.
@@ -506,5 +532,5 @@ Ces routes figuraient dans la première ébauche du contrat mais **ne sont pas e
 
 ## 11. Évolution du contrat
 
-- Version actuelle : **0.10.0** (voir `CHANGELOG.md`). Pendant la phase 0.x, des changements peuvent casser la compatibilité ; chacun est annoncé dans le changelog **avant** déploiement, avec la marche à suivre.
+- Version actuelle : **0.12.0** (voir `CHANGELOG.md`). Pendant la phase 0.x, des changements peuvent casser la compatibilité ; chacun est annoncé dans le changelog **avant** déploiement, avec la marche à suivre.
 - Les ajouts (nouvelle route, nouveau champ facultatif en lecture) ne cassent rien : les ignorer est sans risque. Programmez vos lectures de façon tolérante (ne pas échouer sur un champ inconnu ni sur une valeur d'énumération inconnue : prévoir un affichage par défaut).

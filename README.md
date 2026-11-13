@@ -199,7 +199,7 @@ Un rôle peut être global ou limité à un événement. La matrice complète de
 
 | Document | Pour qui | Contenu |
 |---|---|---|
-| [`openapi.yaml`](openapi.yaml) · [`docs/api.html`](docs/api.html) | Toutes les équipes | Contrat d'API (54 opérations), version navigable |
+| [`openapi.yaml`](openapi.yaml) · [`docs/api.html`](docs/api.html) | Toutes les équipes | Contrat d'API (56 opérations), version navigable |
 | [`docs/GUIDE_FRONTEND.md`](docs/GUIDE_FRONTEND.md) | Équipes front et mobile | Parcours, droits, erreurs, correspondance écran par écran |
 | [`docs/CHANGELOG.md`](docs/CHANGELOG.md) | Équipes front et mobile | Évolutions de l'API, changements cassants signalés |
 | [`docs/DEPLOIEMENT.md`](docs/DEPLOIEMENT.md) | Exploitation | Mise en ligne pas à pas, exploitation, passage en production |

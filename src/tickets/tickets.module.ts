@@ -13,6 +13,6 @@ import { TicketsController } from './tickets.controller';
   imports: [EventsModule],
   controllers: [TicketsController, BrevoWebhookController],
   providers: [RendererService, BrandAssetsService, BrevoClient, TicketFilesService, TicketEmailService, TicketJobs],
-  exports: [TicketFilesService],
+  exports: [TicketFilesService, RendererService],
 })
 export class TicketsModule {}
