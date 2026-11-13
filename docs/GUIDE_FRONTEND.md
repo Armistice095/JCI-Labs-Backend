@@ -1,6 +1,6 @@
 # JCI Comé Labs — Guide d'intégration frontend
 
-**API v0.12.0** · module Événements & Billetterie · à lire avec `openapi.yaml` (référence exacte) et `api.html` (même contenu, lisible dans un navigateur).
+**API v0.13.0** · module Événements & Billetterie · à lire avec `openapi.yaml` (référence exacte) et `api.html` (même contenu, lisible dans un navigateur).
 
 > **Ce que ce document garantit.** `openapi.yaml` ne décrit que ce qui est **déjà en place** côté backend (50 routes). Il est vérifié automatiquement : à chaque modification du backend, des tests comparent les vraies réponses au contrat (route, code HTTP, types, champs obligatoires, valeurs d'énumération, champs non documentés). Si vous constatez un écart, c'est un bug backend : signalez-le.
 
@@ -250,7 +250,7 @@ Interroger GET /public/orders/{reference}?token=…  toutes les 3 s  jusqu'à un
 | `status` | Que montrer |
 |---|---|
 | `PENDING_PAYMENT`, `PAYMENT_IN_PROGRESS` | « Vérification du paiement… » + compte à rebours `reservedUntil` ; continuer d'interroger |
-| `PAID` | Confirmation + liste `tickets`. Tant que `filesReady` vaut `false` (quelques secondes), afficher « Préparation de vos billets… » et continuer d'interroger. Ensuite, pour chaque billet : **Télécharger (PDF)** → `pdfUrl`, **Enregistrer l'image** → `imageUrl`, **Partager sur WhatsApp** → `shareVisualUrl` (voir §7.6) |
+| `PAID` | Confirmation + liste `tickets`. Tant que `filesReady` vaut `false` (moins d'une seconde en général), afficher « Préparation de vos billets… » et continuer d'interroger. Ensuite, pour chaque billet : **Télécharger (PDF)** → `pdfUrl`, **Enregistrer l'image** → `imageUrl` (voir §7.6) |
 | `FAILED` | `message` + bouton **Réessayer** (`POST …/retry-payment`, redirection vers le nouveau `checkoutUrl`), tant que `reservedUntil` n'est pas passé |
 | `EXPIRED` | `message` + bouton « Recommencer » (nouvel achat, nouvelle `Idempotency-Key`) |
 | `REFUND_REQUIRED` | `message` tel quel : paiement reçu mais places indisponibles, l'organisation rembourse. **Ne pas** proposer de réessayer |
@@ -303,19 +303,18 @@ L'**adresse publique** (`slug`) est générée par le serveur à la création (`
 ### 7.5 Annuler un billet
 `POST /tickets/{id}/cancel` avec un motif (3 caractères min.). Le billet est refusé à l'entrée et la place est remise en vente. Impossible si le billet est déjà utilisé (`409`). **Le remboursement d'argent n'est pas géré par l'application** (à faire dans le tableau de bord FedaPay) : l'indiquer dans l'interface.
 
-### 7.6 Billets : fichiers, partage, renvoi
+### 7.6 Billets : fichiers, renvoi
 
-Chaque billet a **trois fichiers**, générés par le serveur quelques secondes après le paiement ou la vente :
+Chaque billet a **deux fichiers**, générés par le serveur en moins d'une seconde après le paiement ou la vente (le visuel de partage a été retiré en 0.13.0) :
 
 | Fichier | Usage | Clé / `kind` |
 |---|---|---|
 | **PDF** (297 × 99,5 mm) | Impression ; pièce jointe de l'e-mail | `pdfUrl` / `pdf` |
 | **Image PNG** (2244 × 752) | Montrer à l'entrée depuis le téléphone ; enregistrer dans la galerie | `imageUrl` / `image` |
-| **Visuel de partage** (JPEG 1080 × 1920) | Publier sur le statut WhatsApp / Facebook. **Sans QR code ni numéro** : il n'ouvre aucun accès | `shareVisualUrl` / `share` |
 
-**Côté acheteur** (page `/commande/:reference`) : les liens sont dans `GET /public/orders/{reference}` → `tickets[]`. Ce sont des **URL signées valables 15 minutes**, renouvelées à chaque appel : ne pas les mémoriser, ne pas les envoyer à un outil d'analyse ; ouvrez-les ou lancez le téléchargement tout de suite. Pour le bouton **Partager** : sur mobile, `navigator.share({ files: [...] })` avec l'image récupérée via `shareVisualUrl` ; à défaut, simple téléchargement. Texte conseillé : « J'y serai ! » + `publicUrl` de l'événement (la page publique est le lien à partager).
+**Côté acheteur** (page `/commande/:reference`) : les liens sont dans `GET /public/orders/{reference}` → `tickets[]`. Ce sont des **URL signées valables 15 minutes**, renouvelées à chaque appel : ne pas les mémoriser, ne pas les envoyer à un outil d'analyse ; ouvrez-les ou lancez le téléchargement tout de suite. Pour un bouton **Partager** : partager **l'adresse de la page publique de l'événement** (`navigator.share({ title, url })`, à défaut copier le lien), jamais l'image du billet : elle contient le QR code qui ouvre l'accès.
 
-**Côté administration / vendeur** : `GET /tickets/{ticketId}/files/{pdf|image|share}` → `{ url, expiresAt, fileName, contentType }`.
+**Côté administration / vendeur** : `GET /tickets/{ticketId}/files/{pdf|image}` → `{ url, expiresAt, fileName, contentType }`.
 - **202 `{ status: "PENDING" }`** : pas encore prêt → réessayer toutes les 2-3 secondes (le serveur relance la génération si besoin). Après une **vente physique**, c'est le cas typique : afficher « Préparation du billet… » puis activer le bouton **Télécharger / Imprimer**.
 - Droits : `participant.read` sur l'événement, ou le **vendeur qui a enregistré la vente**. Sinon 404.
 - **Renvoyer par e-mail** : `POST /tickets/{ticketId}/resend` (corps facultatif `{ "toEmail": "…" }`) → 202. Sans `toEmail` : adresse du bénéficiaire, sinon de l'acheteur (422 s'il n'y en a aucune). 5 renvois par heure et par billet (429 `RATE_LIMITED`). Réservé aux rôles ayant `ticket.resend` ; billet valide uniquement.
@@ -532,5 +531,5 @@ Ces routes figuraient dans la première ébauche du contrat mais **ne sont pas e
 
 ## 11. Évolution du contrat
 
-- Version actuelle : **0.12.0** (voir `CHANGELOG.md`). Pendant la phase 0.x, des changements peuvent casser la compatibilité ; chacun est annoncé dans le changelog **avant** déploiement, avec la marche à suivre.
+- Version actuelle : **0.13.0** (voir `CHANGELOG.md`). Pendant la phase 0.x, des changements peuvent casser la compatibilité ; chacun est annoncé dans le changelog **avant** déploiement, avec la marche à suivre.
 - Les ajouts (nouvelle route, nouveau champ facultatif en lecture) ne cassent rien : les ignorer est sans risque. Programmez vos lectures de façon tolérante (ne pas échouer sur un champ inconnu ni sur une valeur d'énumération inconnue : prévoir un affichage par défaut).

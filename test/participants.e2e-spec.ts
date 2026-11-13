@@ -238,11 +238,11 @@ d('Participants (e2e)', () => {
     expect(used.checkedInAt).not.toBeNull();
   });
 
-  it('fiche billet : « filesReady » dès que les 3 fichiers existent', async () => {
+  it('fiche billet : « filesReady » dès que les 2 fichiers existent', async () => {
     const id = tk['JCI-2026-000001'];
     expect(json(await call(`/tickets/${id}`, ids.admin)).filesReady).toBe(false);
-    for (const kind of ['TICKET_PDF', 'TICKET_IMAGE', 'SHARE_VISUAL'] as const) {
-      await prisma.generatedFile.create({ data: { kind, ticketId: id, eventId, bucket: 'tickets', storagePath: `x/${kind}`, mime: 'application/pdf', sizeBytes: 1, templateVersion: 1 } });
+    for (const kind of ['TICKET_PDF', 'TICKET_IMAGE'] as const) {
+      await prisma.generatedFile.create({ data: { kind, ticketId: id, eventId, bucket: 'tickets', storagePath: `x/${kind}`, mime: 'application/pdf', sizeBytes: 1, templateVersion: 2 } });
     }
     expect(json(await call(`/tickets/${id}`, ids.admin)).filesReady).toBe(true);
   });

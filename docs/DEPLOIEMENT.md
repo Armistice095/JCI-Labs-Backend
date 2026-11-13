@@ -9,7 +9,7 @@
 | Limite | Conséquence |
 |---|---|
 | Le service **s'endort après 15 min sans trafic** ; ~1 min pour se réveiller | La première requête après une pause est lente. Les tâches de fond sont aussi à l'arrêt pendant le sommeil. |
-| **512 Mo de mémoire** | Node (~210 Mo) + Chromium pendant la génération d'un billet (~270 Mo en mode faible mémoire) : **ça passe de justesse**. À tester dès le premier déploiement (étape 6). |
+| **512 Mo de mémoire** | Node (~210 Mo) ; les billets n'ajoutent presque rien (pas de navigateur). Chromium (~270 Mo en mode faible mémoire) n'est lancé que pour un rapport PDF de l'événement : **ça passe**, mais éviter de télécharger plusieurs rapports en même temps. À tester dès le premier déploiement (étape 6). |
 | Pas de shell, disque éphémère, pas de `preDeployCommand` | Les **migrations se lancent depuis votre poste** (étape 2). Tous les fichiers sont dans Supabase Storage, rien n'est perdu au redémarrage. |
 | Usage non destiné à la production (selon Render) | Parfait pour la recette ; pour la **vraie vente de billets**, passer à un hébergement qui reste allumé (voir « Passer en production »). |
 
@@ -126,7 +126,7 @@ Le dépôt peut être **privé** : Render s'y connecte via son application GitHu
 | Le déploiement échoue, journaux : `Configuration invalide : - XXX: …` | Variable d'environnement manquante ou mal formée | Render → Environment, corriger la variable citée |
 | `ENETUNREACH` ou `ECONNREFUSED` vers la base | `DIRECT_URL` pointe vers `db.xxxx.supabase.co` (IPv6) | Utiliser les adresses du **pooler** (étape 1) |
 | Migrations qui échouent ou file de tâches instable | `DIRECT_URL` utilise le pooler **transaction** (port 6543) | Mettre le pooler **session** (port 5432) |
-| Déploiement « Live » puis `Out of memory (used over 512Mi)` pendant un achat | Chromium + Node dépassent 512 Mo | Vérifier `CHROMIUM_LOW_MEMORY=true` et `NODE_OPTIONS`. Si cela persiste : plan Render payant ou serveur plus grand. La tâche de rattrapage régénère les billets manquants chaque minute, rien n'est perdu. |
+| Déploiement « Live » puis `Out of memory (used over 512Mi)` pendant le téléchargement d'un rapport PDF | Chromium + Node dépassent 512 Mo | Vérifier `CHROMIUM_LOW_MEMORY=true` et `NODE_OPTIONS`. Si cela persiste : plan Render payant ou serveur plus grand. Un achat n'est pas concerné : les billets se génèrent sans Chromium. |
 | Les appels du front échouent avec « CORS policy » | `CORS_ORIGINS` incomplet | Ajouter l'adresse exacte du front (schéma `https://`, sans `/` final) |
 | Le front affiche « Connexion impossible » sans erreur CORS | Politique CSP du front (`connect-src`) qui n'autorise pas l'adresse de l'API | Corriger la CSP du front |
 | Le webhook FedaPay répond 401 | `FEDAPAY_WEBHOOK_SECRET` ne correspond pas au secret du webhook | Recopier le secret de signature affiché par FedaPay |

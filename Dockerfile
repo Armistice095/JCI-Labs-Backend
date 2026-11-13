@@ -1,4 +1,4 @@
-# Image de l'API ET du worker (même image, commande différente). Chromium sert à générer les billets (PDF/PNG).
+# Image de l'API ET du worker (même image, commande différente). Chromium ne sert qu'aux rapports PDF de l'événement ; les billets (PDF/PNG) sont dessinés sans navigateur.
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*

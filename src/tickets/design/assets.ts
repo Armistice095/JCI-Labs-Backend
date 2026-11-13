@@ -10,6 +10,9 @@ const dir = (() => {
   throw new Error(`Dossier assets/ introuvable (racine : ${ROOT})`);
 })();
 
+/** Dossier assets/ (logos, polices). */
+export const assetsDir = () => dir;
+
 const b64 = (file: string) => readFileSync(join(dir, file)).toString('base64');
 
 export interface DesignAssets { logoColor: string; logoWhite: string; fontCss: string }

@@ -177,7 +177,7 @@ export class OrdersService {
       message: MESSAGES[o.status] ?? null,
       tickets: o.status === 'PAID' ? o.tickets.map((t) => {
         const u = urls.get(t.id);
-        return { number: t.number, holderName: `${t.holderFirstName} ${t.holderLastName}`, category: t.category.name, filesReady: !!u, pdfUrl: u?.pdfUrl ?? null, imageUrl: u?.imageUrl ?? null, shareVisualUrl: u?.shareVisualUrl ?? null };
+        return { number: t.number, holderName: `${t.holderFirstName} ${t.holderLastName}`, category: t.category.name, filesReady: !!u, pdfUrl: u?.pdfUrl ?? null, imageUrl: u?.imageUrl ?? null };
       }) : [],
     };
   }

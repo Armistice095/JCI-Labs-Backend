@@ -18,7 +18,7 @@ services:
       # ── Fonctionnement ──
       - { key: NODE_ENV, value: production }
       - { key: PROCESS_ROLE, value: all }
-      - { key: NODE_OPTIONS, value: --max-old-space-size=256 }   # borne la mémoire de Node pour laisser de la place à Chromium
+      - { key: NODE_OPTIONS, value: --max-old-space-size=256 }   # borne la mémoire de Node pour laisser de la place à Chromium (rapports PDF)
       - { key: CHROMIUM_LOW_MEMORY, value: "true" }              # Chromium en un seul processus, éteint au repos (512 Mo). Mettre "false" dès que la mémoire dépasse 1 Go.
       - { key: FEDAPAY_ENV, value: sandbox }                     # passer à « live » (avec les clés live) pour la vraie vente
       - { key: POSTER_BUCKET, value: event-posters }

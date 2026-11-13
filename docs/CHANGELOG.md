@@ -2,6 +2,27 @@
 
 Format : le plus récent en premier. « Cassant » = nécessite une adaptation des interfaces.
 
+## 0.13.0 — billets sans Chromium, nouveau design, visuel de partage retiré
+
+**Cassant (petit) — à répercuter dans les interfaces :**
+- `GET /public/orders/{reference}` : le champ `tickets[].shareVisualUrl` **n'existe plus**. Retirer le bouton « Partager sur WhatsApp » qui l'utilisait (ou ne partager que l'adresse de la page).
+- `GET /tickets/{ticketId}/files/{kind}` : `kind` = `pdf` ou `image` seulement ; `share` répond **422**.
+- `filesReady` vaut `true` dès que le PDF **et** l'image existent (2 fichiers par billet, au lieu de 3).
+- L'e-mail de confirmation ne joint plus que les PDF (plus de « Partage-….jpg »).
+
+**Billets : beaucoup plus rapides.** Le PDF et le PNG ne passent plus par Chromium : un dessin SVG unique (texte converti en tracés) est converti en PNG par `resvg` et en PDF par `pdfkit`. Environ 0,25 s par billet au lieu de ~1,1 s (hors lancement de Chromium, qui ajoutait ~1,5 s au premier billet et après chaque période d'inactivité sur l'hébergement à mémoire serrée), moins de 50 Mo de mémoire en plus. **L'achat n'attend plus Chromium**, qui ne sert plus qu'aux 4 rapports PDF.
+
+**Nouveau design du billet** (`TEMPLATE_VERSION` = 2) :
+- plus de « Billet d'accès », de pastille de numéro ni de QR code dans le corps du billet (le QR code reste sur la souche) ;
+- plus de logo au centre (il en reste un sur l'affiche et un sur la souche) ;
+- affiche plus étroite, avec le **titre de l'événement écrit dessus** ;
+- nom, date, heure et lieu disposent de toute la largeur centrale.
+
+**À savoir au déploiement :**
+- Les billets déjà émis (version 1) ne sont plus servis : la tâche de rattrapage (chaque minute, commandes payées depuis moins de 7 jours, 30 par passage) les **régénère au nouveau design**, sans renvoyer d'e-mail. Les fichiers v1 restent en stockage ; l'ancienne valeur `SHARE_VISUAL` reste dans l'énumération de la base (aucune migration).
+- Nouvelles dépendances : `@resvg/resvg-js` (binaire natif, aucune installation système), `pdfkit`, `svg-to-pdfkit`, `fontkit`. Rien à ajouter au Dockerfile.
+- Les noms contenant des caractères absents de la police (emoji, alphabets non latins) sont affichés sans ces caractères.
+
 ## 0.12.0 — documents PDF de l'événement (onglet « Documents »)
 
 **Nouvelles routes** (56 au total) — *additif, rien ne casse* :

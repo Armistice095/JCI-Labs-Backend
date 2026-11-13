@@ -19,7 +19,7 @@ Ce dépôt contient **le backend**. Il est consommé par trois applications :
 - **Événements** : brouillon, publication, clôture, annulation ; affiches, catégories de billets, quotas, ouverture et fermeture de la billetterie (statut calculé) ; textes d'information avec repli sur un texte général JCI et FAQ.
 - **Vente en ligne** : réservation des places (15 min), commande sans compte, paiement mobile FedaPay, protection anti-robots (Cloudflare Turnstile), idempotence des requêtes.
 - **Vente physique** : un vendeur enregistre une vente au guichet (espèces, Mobile Money) ; le billet est remis en main propre ou envoyé par e-mail.
-- **Billets** : PDF imprimable, image pour téléphone et visuel de partage WhatsApp, générés avec Chromium ; QR code à jeton aléatoire ; e-mails Brevo avec suivi de livraison ; renvoi et rattrapage automatique.
+- **Billets** : PDF imprimable et image pour téléphone, générés sans navigateur (SVG → `resvg` + `pdfkit`, ~0,25 s par billet) ; QR code à jeton aléatoire ; e-mails Brevo avec suivi de livraison ; renvoi et rattrapage automatique.
 - **Contrôle d'accès** : scan d'un billet depuis l'application mobile, admission **unique même avec plusieurs téléphones en même temps**, rejeu sans double comptage, compteurs d'entrée en direct.
 - **Pilotage** : participants (recherche, filtres, export CSV et Excel), vue d'ensemble d'un événement, tableau de bord global, paiements, annulation de billets.
 - **Gouvernance** : cinq rôles, droits globaux ou limités à un événement, journal d'audit de toutes les actions sensibles.
@@ -36,7 +36,7 @@ flowchart LR
   subgraph Render["Hébergement (Docker)"]
     API["API NestJS + Fastify<br/>/api/v1"]
     JOBS["Tâches de fond (pg-boss)<br/>billets · e-mails · webhooks · maintenance"]
-    CHR["Chromium<br/>PDF et images"]
+    CHR["Chromium<br/>rapports PDF"]
   end
   subgraph Supabase
     DB[(PostgreSQL)]
@@ -69,7 +69,7 @@ flowchart LR
 | Authentification, fichiers | Supabase Auth, Supabase Storage |
 | Paiement | FedaPay (mobile money) |
 | E-mails | Brevo (API transactionnelle et webhooks) |
-| Billets | Chromium headless (Puppeteer) : PDF et PNG ; QR code |
+| Billets | SVG → PNG (`resvg`) et PDF (`pdfkit`), QR code vectoriel. Chromium headless (Puppeteer) pour les rapports PDF |
 | Tâches de fond | pg-boss |
 | Anti-robots | Cloudflare Turnstile |
 | Contrat d'API | OpenAPI 3.0.3, vérifié par les tests |
@@ -85,7 +85,7 @@ src/
   events/         événements, affiches, textes par défaut
   ticketing/      paramètres de billetterie, catégories, stock
   sales/          commandes, paiement FedaPay, ventes physiques, pages publiques
-  tickets/        billets : design, rendu Chromium, fichiers, e-mails Brevo
+  tickets/        billets : design (SVG), rendu, fichiers, e-mails Brevo
   checkin/        contrôle d'accès (scan, compteurs)
   participants/   liste, export CSV/Excel, fiche d'un billet
   overview/       vue d'ensemble d'un événement
@@ -108,7 +108,7 @@ Dockerfile · docker-compose.yml · Caddyfile
 
 ## Démarrage rapide
 
-**Prérequis** : Node.js 22+, un projet Supabase (voir [docs/DEPLOIEMENT.md](docs/DEPLOIEMENT.md), étape 1), Chromium ou Chrome pour générer les billets.
+**Prérequis** : Node.js 22+, un projet Supabase (voir [docs/DEPLOIEMENT.md](docs/DEPLOIEMENT.md), étape 1), Chromium ou Chrome pour générer les rapports PDF.
 
 ```bash
 cp .env.example .env                       # renseigner les valeurs (voir « Configuration »)
@@ -169,7 +169,7 @@ DIRECT_URL=... npm run db:sql
 TEST_DATABASE_URL=postgresql://... npm run test:e2e
 ```
 
-Le rendu des billets utilise un vrai Chromium : définir `CHROMIUM_PATH` pour le test de vente.
+Les billets n'utilisent plus de navigateur ; seuls les tests des rapports PDF et du rendu Chromium ont besoin de `CHROMIUM_PATH`.
 
 **Le contrat d'API est vérifié par les tests.** Chaque réponse réelle est comparée à `openapi.yaml` (route, statut, types, champs obligatoires, énumérations, champs non documentés) : une route ajoutée sans être documentée fait échouer la suite. Une intégration continue (GitHub Actions) compile, lance les tests unitaires et valide le contrat à chaque push.
 
@@ -179,7 +179,7 @@ Le rendu des billets utilise un vrai Chromium : définir `CHROMIUM_PATH` pour le
 - **Pas de survente.** Réservation de stock par mise à jour atomique : 20 acheteurs simultanés pour 5 places donnent exactement 5 commandes (testé).
 - **Pas de double entrée.** L'admission d'un billet est une opération atomique en base : 20 scans simultanés du même billet donnent une seule admission (testé). Les scans sont rejouables sans double comptage.
 - **Rien ne se perd.** Chaque tâche est rejouée avec attente croissante ; la maintenance relance paiements, billets et e-mails en retard.
-- **Moindre exposition.** Un événement hors du périmètre d'un utilisateur répond 404 (son existence n'est pas révélée) ; le visuel de partage ne contient jamais le QR code ni le nom complet ; les billets sont dans un stockage privé à liens temporaires ; le journal des scans ne conserve que les 6 premiers caractères du jeton.
+- **Moindre exposition.** Un événement hors du périmètre d'un utilisateur répond 404 (son existence n'est pas révélée) ; les billets sont dans un stockage privé à liens temporaires ; le journal des scans ne conserve que les 6 premiers caractères du jeton.
 - **Traçabilité.** Les actions sensibles écrivent dans `audit_logs` ; tous les scans sont journalisés (agent, appareil, heure).
 - **Dates.** Saisies en heure locale (Africa/Porto-Novo, UTC+1), stockées en UTC.
 
@@ -218,7 +218,7 @@ Le palier gratuit **s'endort après 15 minutes** et dispose de **512 Mo** : adap
 |---|---|---|
 | Socle | Authentification, utilisateurs, rôles, événements, affiches, billetterie, audit | Fait |
 | Ventes | Réservation, commandes, FedaPay, ventes physiques, annulation de billets | Fait |
-| Billets | PDF, image, QR code, visuel de partage, e-mails Brevo, rattrapage | Fait |
+| Billets | PDF, image, QR code, e-mails Brevo, rattrapage | Fait |
 | Pilotage | Participants et exports, vue d'ensemble, tableau de bord | Fait |
 | Page publique | Textes par défaut, FAQ, données de la page de vente | Fait (API) |
 | Contrôle d'accès | Scan atomique, compteurs (application JCI Stafs) | Fait (API) |

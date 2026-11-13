@@ -107,17 +107,13 @@ d('Ventes (e2e)', () => {
     await new Promise<void>((r) => brevoSrv.listen(0, '127.0.0.1', r));
     const brevoPort = (brevoSrv.address() as import('node:net').AddressInfo).port;
 
-    // Chromium : CHROMIUM_PATH, sinon celui de @sparticuz/chromium (Linux)
-    let chromiumPath = process.env.CHROMIUM_PATH;
-    if (!chromiumPath) chromiumPath = await (await import('@sparticuz/chromium')).default.executablePath();
-
     Object.assign(process.env, {
       DATABASE_URL: TEST_DB, DIRECT_URL: TEST_DB, SUPABASE_URL: 'http://localhost:54321', SUPABASE_SERVICE_ROLE_KEY: 'x'.repeat(30),
       PUBLIC_WEB_URL: 'http://localhost:5173', ADMIN_WEB_URL: 'http://localhost:5174',
       FEDAPAY_SECRET_KEY: 'sk_sandbox_test_key', FEDAPAY_WEBHOOK_SECRET: WH_SECRET, FEDAPAY_API_BASE: `http://127.0.0.1:${port}`,
       RATE_LIMIT_DISABLED: 'true', JOBS_POLL_SECONDS: '0.5', PROCESS_ROLE: 'all',
       BREVO_API_KEY: 'xkeysib-test-key', BREVO_SENDER_EMAIL: 'billets@jci-come.bj', BREVO_API_BASE: `http://127.0.0.1:${brevoPort}`, BREVO_WEBHOOK_TOKEN: BREVO_TOKEN,
-      CHROMIUM_PATH: chromiumPath, CHROMIUM_HEADLESS_SHELL: process.env.CHROMIUM_HEADLESS_SHELL ?? 'true', TICKET_QR_BASE_URL: 'https://jcicomee.com/billet',
+      TICKET_QR_BASE_URL: 'https://jcicomee.com/billet',
     });
     const { Test } = await import('@nestjs/testing');
     const { FastifyAdapter } = await import('@nestjs/platform-fastify');
@@ -286,40 +282,41 @@ d('Ventes (e2e)', () => {
   // ───────────── Billets : fichiers, e-mail, suivi ─────────────
   const png = (b: Buffer) => PNG.sync.read(b);
   const filesOf = (ticketIds: string[]) => prisma.generatedFile.findMany({ where: { ticketId: { in: ticketIds } }, orderBy: { storagePath: 'asc' } });
-  const waitFiles = (ticketIds: string[]) => waitFor(async () => { const f = await filesOf(ticketIds); return f.length === ticketIds.length * 3 ? f : false; }, 40000);
+  // Le journal d'e-mail est validé APRÈS la réponse de Brevo (même transaction) : on l'attend au lieu de le lire aussitôt.
+  const sentLog = (where: object) => waitFor(async () => (await prisma.emailLog.findFirst({ where: { ...where, status: 'SENT' } })) ?? false, 15000);
+  const waitFiles = (ticketIds: string[]) => waitFor(async () => { const f = await filesOf(ticketIds); return f.length === ticketIds.length * 2 ? f : false; }, 40000);
 
-  it('billets : fichiers générés (PDF, image, visuel de partage) et enregistrés dans le stockage privé', async () => {
+  it('billets : fichiers générés (PDF et image) et enregistrés dans le stockage privé', async () => {
     const st = await state(ref1);
     const files = await waitFiles(st.tickets.map((t) => t.id));
-    expect(files.map((f) => f.kind).sort()).toEqual(['SHARE_VISUAL', 'SHARE_VISUAL', 'TICKET_IMAGE', 'TICKET_IMAGE', 'TICKET_PDF', 'TICKET_PDF']);
-    expect(files.every((f) => f.bucket === 'tickets' && f.templateVersion === 1 && f.sizeBytes > 1000)).toBe(true);
+    expect(files.map((f) => f.kind).sort()).toEqual(['TICKET_IMAGE', 'TICKET_IMAGE', 'TICKET_PDF', 'TICKET_PDF']);
+    expect(files.every((f) => f.bucket === 'tickets' && f.templateVersion === 2 && f.sizeBytes > 1000)).toBe(true);
     const t1 = st.tickets.find((t) => t.number.endsWith('000001'))!;
     for (const f of files.filter((x) => x.ticketId === t1.id)) {
       const obj = storage.bucket('tickets').get(f.storagePath)!;
       expect(obj.data.length).toBe(f.sizeBytes);
-      expect(f.storagePath).toBe(`${eventId}/${t1.id}/${t1.number}-v1.${f.kind === 'TICKET_PDF' ? 'pdf' : f.kind === 'TICKET_IMAGE' ? 'png' : 'jpg'}`);
+      expect(f.storagePath).toBe(`${eventId}/${t1.id}/${t1.number}-v2.${f.kind === 'TICKET_PDF' ? 'pdf' : 'png'}`);
       if (f.kind === 'TICKET_PDF') { expect(obj.data.subarray(0, 5).toString()).toBe('%PDF-'); expect(f.mime).toBe('application/pdf'); }
       if (f.kind === 'TICKET_IMAGE') { const im = png(obj.data); expect([im.width, im.height]).toEqual([2244, 752]); expect(f.mime).toBe('image/png'); }
-      if (f.kind === 'SHARE_VISUAL') { expect(obj.data.subarray(0, 3).toString('hex')).toBe('ffd8ff'); expect(f.mime).toBe('image/jpeg'); }
     }
     // le contenu n'est jamais public : bucket « tickets », jamais « event-posters »
     expect([...storage.bucket('event-posters').keys()].some((k) => k.includes('JCI-'))).toBe(false);
   });
 
-  it('e-mail de confirmation : une seule fois, avec les PDF et le visuel de partage en pièces jointes', async () => {
+  it('e-mail de confirmation : une seule fois, avec les PDF en pièces jointes', async () => {
     const st = await state(ref1);
     const mail = await waitFor(async () => mails.find((m) => m.body.to[0].email === 'koffi@exemple.bj') ?? false, 40000);
     const b = mail.body;
     expect(b.sender).toEqual({ name: 'JCI Comé Excellence', email: 'billets@jci-come.bj' });
     expect(b.subject).toBe('Vos 2 billets — Leadership & Impact');
     const nums = st.tickets.map((t) => t.number).sort();
-    expect(b.attachment.map((a: any) => a.name).sort()).toEqual([`Billet-${nums[0]}.pdf`, `Billet-${nums[1]}.pdf`, `Partage-${nums[0]}.jpg`].sort());
+    expect(b.attachment.map((a: any) => a.name).sort()).toEqual([`Billet-${nums[0]}.pdf`, `Billet-${nums[1]}.pdf`]);
     for (const a of b.attachment.filter((x: any) => x.name.endsWith('.pdf'))) expect(Buffer.from(a.content, 'base64').subarray(0, 5).toString()).toBe('%PDF-');
     expect(b.htmlContent).toContain(`/commande/${ref1}?token=${token1}`);
     expect(b.htmlContent).toContain(nums[0]);
     expect(b.htmlContent).not.toMatch(/xk3p|qr_token/i);               // aucun jeton de QR dans l'e-mail
 
-    const log = await prisma.emailLog.findFirstOrThrow({ where: { orderId: st.id } });
+    const log = await sentLog({ orderId: st.id });
     expect(log).toMatchObject({ template: 'TICKET_CONFIRMATION', toEmail: 'koffi@exemple.bj', status: 'SENT', attempt: 1 });
     expect(log.brevoMessageId).toBe(`20261107.${mail.n}@smtp-relay.mailin.fr`); // stocké sans chevrons
 
@@ -338,7 +335,7 @@ d('Ventes (e2e)', () => {
     for (const t of s.tickets) {
       expect(t.filesReady).toBe(true);
       expect(t.pdfUrl).toMatch(/^http:\/\/storage\.test\/tickets\/.+\.pdf\?token=.+&download=Billet-JCI-/);
-      expect(t.imageUrl).toMatch(/\.png\?/); expect(t.shareVisualUrl).toMatch(/\.jpg\?/);
+      expect(t.imageUrl).toMatch(/\.png\?/); expect(t).not.toHaveProperty('shareVisualUrl'); // visuel de partage retiré (0.13.0)
     }
   });
 
@@ -375,19 +372,19 @@ d('Ventes (e2e)', () => {
     expect(pdf.url).toContain('storage.test/tickets/');
     expect(new Date(pdf.expiresAt).getTime()).toBeGreaterThan(Date.now() + 10 * 60_000);
     expect(json(await call('GET', `/tickets/${t.id}/files/image`, { as: ids.admin })).contentType).toBe('image/png');
-    expect(json(await call('GET', `/tickets/${t.id}/files/share`, { as: ids.admin })).fileName).toBe(`Partage-${t.number}.jpg`);
+    expect((await call('GET', `/tickets/${t.id}/files/share`, { as: ids.admin })).statusCode).toBe(422); // le visuel de partage n'existe plus
     expect((await call('GET', `/tickets/${t.id}/files/zip`, { as: ids.admin })).statusCode).toBe(422);
     expect((await call('GET', `/tickets/${t.id}/files/pdf`, { as: ids.organizer })).statusCode).toBe(404); // hors de son périmètre
     expect((await call('GET', `/tickets/${randomUUID()}/files/pdf`, { as: ids.admin })).statusCode).toBe(404);
     expect((await call('GET', `/tickets/${t.id}/files/pdf`)).statusCode).toBe(401);
 
     // Fichier manquant : 202 « en cours », la génération est relancée seule
-    await prisma.generatedFile.deleteMany({ where: { ticketId: t.id, kind: 'SHARE_VISUAL' } });
-    const pending = await call('GET', `/tickets/${t.id}/files/share`, { as: ids.admin });
+    await prisma.generatedFile.deleteMany({ where: { ticketId: t.id, kind: 'TICKET_IMAGE' } });
+    const pending = await call('GET', `/tickets/${t.id}/files/image`, { as: ids.admin });
     expect(pending.statusCode).toBe(202);
     expect(json(pending)).toEqual({ status: 'PENDING' });
-    const ready = await waitFor(async () => { const r = await call('GET', `/tickets/${t.id}/files/share`, { as: ids.admin }); return r.statusCode === 200 ? json(r) : false; }, 40000);
-    expect(ready.fileName).toBe(`Partage-${t.number}.jpg`);
+    const ready = await waitFor(async () => { const r = await call('GET', `/tickets/${t.id}/files/image`, { as: ids.admin }); return r.statusCode === 200 ? json(r) : false; }, 40000);
+    expect(ready.fileName).toBe(`Billet-${t.number}.png`);
     expect(mails.filter((m) => m.body.to[0].email === 'koffi@exemple.bj')).toHaveLength(1); // la régénération n'a pas renvoyé d'e-mail
   }, 90000);
 
@@ -403,7 +400,7 @@ d('Ventes (e2e)', () => {
     expect(mail.body.subject).toBe('Votre billet — Leadership & Impact');
     expect(mail.body.attachment.filter((a: any) => a.name.endsWith('.pdf'))).toHaveLength(1);
     expect(mail.body.attachment[0].name).toBe(`Billet-${t.number}.pdf`);
-    const log = await prisma.emailLog.findFirstOrThrow({ where: { ticketId: t.id, template: 'TICKET_RESEND' } });
+    const log = await sentLog({ ticketId: t.id, template: 'TICKET_RESEND' });
     expect(log).toMatchObject({ status: 'SENT', toEmail: 'autre@exemple.bj', orderId: st.id });
     expect(await prisma.auditLog.count({ where: { action: 'ticket.resend', entityId: t.id } })).toBe(1);
 
@@ -694,7 +691,7 @@ d('Ventes (e2e)', () => {
     expect(run.requeued).toBeGreaterThanOrEqual(1);
     await waitFiles(ids2);
     await waitFor(async () => mails.find((m) => m.body.to[0].email === 'ama2@exemple.bj') ?? false, 40000);
-    expect((await prisma.emailLog.findFirstOrThrow({ where: { orderId: o2.id } })).status).toBe('SENT');
+    expect((await sentLog({ orderId: o2.id })).status).toBe('SENT');
   }, 120000);
 
   it('annulation : droit requis, place remise en vente, jamais un billet déjà utilisé', async () => {

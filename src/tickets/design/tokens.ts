@@ -87,9 +87,3 @@ export function fit(text: string, scale: [number, number][], fallback: number): 
   for (const [max, size] of scale) if (text.length <= max) return size;
   return fallback;
 }
-
-/** « Koffi Ahoussou » → « Koffi A. » (visuel de partage : on ne publie pas le nom complet). */
-export function shortName(first: string, last: string): string {
-  const l = last.trim().charAt(0).toUpperCase();
-  return l ? `${first.trim()} ${l}.` : first.trim();
-}

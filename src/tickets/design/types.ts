@@ -21,5 +21,3 @@ export interface TicketRenderData {
 
 export const TICKET_W = 1122; // 297 mm à 96 dpi
 export const TICKET_H = 376;  // ≈ 99,5 mm
-export const SHARE_W = 1080;
-export const SHARE_H = 1920;

@@ -54,9 +54,9 @@ export class TicketEmailService {
     tickets: { id: string; number: string; holderFirstName: string; holderLastName: string; category: { name: string } }[],
     accessToken: string | null, toEmail: string,
   ) {
-    // Pièces jointes : PDF de chaque billet + visuel de partage du premier ; si le total dépasse le budget, on envoie des liens seulement.
+    // Pièces jointes : PDF de chaque billet ; si le total dépasse le budget, on envoie des liens seulement.
     const attachment: BrevoAttachment[] = [];
-    let total = 0; let pdfAttached = true; let shareAttached = false;
+    let total = 0; let pdfAttached = true;
     for (const t of tickets) {
       const pdf = await this.files.getBuffer(t.id, 'pdf');
       if (!pdf) throw new Error(`PDF du billet ${t.number} introuvable (génération en cours ?)`);
@@ -65,15 +65,11 @@ export class TicketEmailService {
       attachment.push({ name: `Billet-${t.number}.pdf`, content: pdf.toString('base64') });
     }
     if (!pdfAttached) attachment.length = 0;
-    else {
-      const share = await this.files.getBuffer(tickets[0].id, 'share');
-      if (share && total + share.length <= MAX_ATTACH_BYTES) { attachment.push({ name: `Partage-${tickets[0].number}.jpg`, content: share.toString('base64') }); shareAttached = true; }
-    }
     const mail = buildTicketEmail({
       kind, buyerFirstName: firstName, reference: kind === 'CONFIRMATION' ? reference : null, event,
       tickets: tickets.map((t) => ({ holderName: `${t.holderFirstName} ${t.holderLastName}`, categoryName: t.category.name, number: t.number })),
       orderUrl: accessToken && reference ? `${this.env.PUBLIC_WEB_URL}/commande/${reference}?token=${accessToken}` : null,
-      logoUrl: this.brand.logoUrl, pdfAttached, shareAttached,
+      logoUrl: this.brand.logoUrl, pdfAttached,
     });
     return {
       to: [{ email: toEmail, name: firstName }],
