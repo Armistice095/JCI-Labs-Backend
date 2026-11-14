@@ -3,6 +3,7 @@
 //   npm run posters:share -- --force → recrée toutes les variantes
 import 'dotenv/config';
 import { createClient } from '@supabase/supabase-js';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 import { buildShareImage } from '../src/events/share-image';
 
@@ -11,7 +12,9 @@ async function main() {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error('SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY manquants dans .env');
   const bucketName = process.env.POSTER_BUCKET ?? 'event-posters';
   const bucket = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } }).storage.from(bucketName);
-  const prisma = new PrismaClient();
+  const url = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
+  if (!url) throw new Error('DATABASE_URL (ou DIRECT_URL) manquant dans .env');
+  const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
   try {
     const posters = await prisma.eventPoster.findMany({ where: process.argv.includes('--force') ? {} : { sharePath: null } });
     console.log(`${posters.length} affiche(s) à traiter.`);
