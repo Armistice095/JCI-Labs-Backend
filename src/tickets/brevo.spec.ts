@@ -21,7 +21,7 @@ const input: TicketEmailInput = {
   kind: 'CONFIRMATION', buyerFirstName: 'Koffi', reference: 'CMD-0012',
   event: { title: 'Leadership & Impact', startsAt: new Date('2026-11-28T07:00:00Z'), venueName: 'Centre des Congrès', city: 'Comé', contactEmail: 'contact@jci.bj', contactPhone: '+229 01 95 78 95 13' },
   tickets: [{ holderName: 'Koffi Ahoussou', categoryName: 'Standard', number: 'JCI-2026-000001' }, { holderName: 'Aïcha Hounkpatin', categoryName: 'VIP', number: 'JCI-2026-000002' }],
-  orderUrl: 'https://jcicomee.com/commande/CMD-0012?token=abc&x=1', logoUrl: 'https://cdn.test/logo.png', pdfAttached: true, shareAttached: true,
+  orderUrl: 'https://jcicomee.com/commande/CMD-0012?token=abc&x=1', logoUrl: 'https://cdn.test/logo.png', pdfAttached: true,
 };
 
 describe('e-mail de confirmation', () => {
@@ -31,7 +31,7 @@ describe('e-mail de confirmation', () => {
     expect(buildTicketEmail({ ...input, tickets: [input.tickets[0]] }).subject).toBe('Votre billet — Leadership & Impact');
   });
   it('contenu : événement, billets, bouton, consignes, contact', () => {
-    for (const t of ['Bonjour Koffi', 'CMD-0012', 'Vendredi'.slice(0, 0), '28 Novembre 2026 à 08 h 00', 'Centre des Congrès, Comé', 'JCI-2026-000001', 'JCI-2026-000002', 'Aïcha Hounkpatin', 'Voir et télécharger mes billets', 'personnel', 'une seule fois', 'contact@jci.bj', 'J’y serai'])
+    for (const t of ['Bonjour Koffi', 'CMD-0012', 'Vendredi'.slice(0, 0), '28 Novembre 2026 à 08 h 00', 'Centre des Congrès, Comé', 'JCI-2026-000001', 'JCI-2026-000002', 'Aïcha Hounkpatin', 'Voir et télécharger mes billets', 'personnel', 'une seule fois', 'contact@jci.bj'])
       expect(m.html).toContain(t);
   });
   it('lien de suivi correctement échappé', () => expect(m.html).toContain('token=abc&amp;x=1'));
@@ -41,7 +41,7 @@ describe('e-mail de confirmation', () => {
     expect(evil.html).not.toMatch(/<script>/i);
     expect(evil.html).not.toMatch(/<img src=x/i);
   });
-  it('sans pièce jointe : renvoie vers le bouton', () => expect(buildTicketEmail({ ...input, pdfAttached: false, shareAttached: false }).html).toContain('Téléchargez vos billets depuis le bouton'));
+  it('sans pièce jointe : renvoie vers le bouton', () => expect(buildTicketEmail({ ...input, pdfAttached: false }).html).toContain('Téléchargez vos billets depuis le bouton'));
   it('renvoi manuel : texte adapté, sans numéro de commande', () => {
     const r = buildTicketEmail({ ...input, kind: 'RESEND', reference: null, tickets: [input.tickets[0]] });
     expect(r.html).toContain('Voici votre billet');

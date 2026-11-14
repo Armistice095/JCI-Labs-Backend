@@ -9,6 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SupabaseAdminService } from '../supabase/supabase-admin.service';
 import { EventAccess } from './event-access.service';
 import { posterUrl } from './poster-url';
+import { buildShareImage } from './share-image';
 
 const MAX_POSTERS = 5;
 const MAX_BYTES = 2 * 1024 * 1024;
@@ -51,20 +52,37 @@ export class PostersService {
     const { error } = await this.bucket.upload(storagePath, buffer, { contentType: type.mime, cacheControl: '31536000', upsert: false });
     if (error) { this.log.error(`upload: ${error.message}`); throw validation("Impossible d'enregistrer l'image."); }
 
+    // Variante légère pour l'aperçu des liens partagés : si elle échoue, l'affiche est quand même enregistrée (l'aperçu utilisera l'original).
+    const sharePath = await this.storeShareImage(storagePath, buffer, type.mime as 'image/png' | 'image/jpeg');
+
     try {
       const poster = await this.prisma.$transaction(async (tx) => {
         const count = await tx.eventPoster.count({ where: { eventId } });
         const isCover = wantCover || count === 0;
         if (isCover) await tx.eventPoster.updateMany({ where: { eventId }, data: { isCover: false } });
         return tx.eventPoster.create({
-          data: { eventId, storagePath, mime: type.mime, sizeBytes: buffer.length, width: dims.width ?? null, height: dims.height ?? null, position: count, isCover },
+          data: { eventId, storagePath, sharePath, mime: type.mime, sizeBytes: buffer.length, width: dims.width ?? null, height: dims.height ?? null, position: count, isCover },
         });
       });
       await this.audit.log({ actorId: user.id, action: 'event.poster_add', entityType: 'event', entityId: eventId });
       return this.toDto(poster);
     } catch (e) {
-      await this.bucket.remove([storagePath]);
+      await this.bucket.remove([storagePath, ...(sharePath ? [sharePath] : [])]);
       throw e;
+    }
+  }
+
+  /** Génère et envoie la variante d'aperçu (…-share.jpg à côté de l'original). Retourne son chemin, ou null en cas d'échec. */
+  async storeShareImage(storagePath: string, original: Buffer, mime: 'image/png' | 'image/jpeg'): Promise<string | null> {
+    const path = storagePath.replace(/\.[a-z]+$/, '-share.jpg');
+    try {
+      const jpeg = await buildShareImage(original, mime);
+      const { error } = await this.bucket.upload(path, jpeg, { contentType: 'image/jpeg', cacheControl: '31536000', upsert: true });
+      if (error) throw new Error(error.message);
+      return path;
+    } catch (e) {
+      this.log.warn(`Image d'aperçu non générée pour ${storagePath} : ${(e as Error).message}`);
+      return null;
     }
   }
 
@@ -91,16 +109,16 @@ export class PostersService {
         if (next) await tx.eventPoster.update({ where: { id: next.id }, data: { isCover: true } });
       }
     });
-    const { error } = await this.bucket.remove([p.storagePath]);
+    const { error } = await this.bucket.remove([p.storagePath, ...(p.sharePath ? [p.sharePath] : [])]);
     if (error) this.log.warn(`Suppression du fichier ${p.storagePath} échouée : ${error.message}`);
     await this.audit.log({ actorId: user.id, action: 'event.poster_remove', entityType: 'event', entityId: eventId });
   }
 
   /** Suppression best-effort des fichiers d'un événement (utilisé à la suppression d'un brouillon). */
   async removeAllFiles(eventId: string) {
-    const posters = await this.prisma.eventPoster.findMany({ where: { eventId }, select: { storagePath: true } });
+    const posters = await this.prisma.eventPoster.findMany({ where: { eventId }, select: { storagePath: true, sharePath: true } });
     if (!posters.length) return;
-    const { error } = await this.bucket.remove(posters.map((p) => p.storagePath));
+    const { error } = await this.bucket.remove(posters.flatMap((p) => [p.storagePath, ...(p.sharePath ? [p.sharePath] : [])]));
     if (error) this.log.warn(`Nettoyage des affiches de ${eventId} : ${error.message}`);
   }
 }

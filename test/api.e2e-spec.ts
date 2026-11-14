@@ -263,6 +263,7 @@ d('API (e2e)', () => {
     };
     const first = json(await upload(PNG, ids.admin));
     expect(first).toMatchObject({ isCover: true, width: 1, height: 1, position: 0 }); // la première affiche devient la couverture
+    expect((await prisma.eventPoster.findUniqueOrThrow({ where: { id: first.id } })).sharePath).toBe(`${eventId}/${(await prisma.eventPoster.findUniqueOrThrow({ where: { id: first.id } })).storagePath.split('/')[1].replace(/\.png$/, '-share.jpg')}`); // variante d'aperçu créée
     const second = json(await upload(PNG, ids.admin, '?isCover=true'));
     expect(second.isCover).toBe(true);
     let ev = json(await call('GET', `/events/${eventId}`, ids.admin));

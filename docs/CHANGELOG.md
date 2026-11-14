@@ -2,6 +2,50 @@
 
 Format : le plus récent en premier. « Cassant » = nécessite une adaptation des interfaces.
 
+## 0.13.2 — aperçu des liens partagés (WhatsApp / Facebook) avec l'affiche
+
+**Sans rupture, mais à répercuter dans la page publique de l'événement :**
+- `og.imageUrl` pointe maintenant vers une **variante légère 1200 × 630 (JPEG, ≈ 50–200 Ko)** de l'affiche de couverture, créée à l'envoi de l'affiche (fond flou + affiche entière au centre). Avant, c'était l'original (jusqu'à 2 Mo) : WhatsApp ignore les images trop lourdes, d'où l'aperçu sans image.
+- Nouveaux champs `og.imageWidth`, `og.imageHeight`, `og.imageType` : à mettre dans `og:image:width`, `og:image:height`, `og:image:type` (et garder `og:image` en URL absolue https).
+- Si une affiche n'a pas de variante (envoyée avant cette version), `og.imageUrl` reste l'original.
+- Base de données : colonne `event_posters.share_path` (migration `20261114090000_poster_share_image`). Lancer `npm run prisma:migrate`.
+- **Affiches déjà envoyées** : `npm run posters:share` crée leurs variantes (relançable sans risque).
+- Le slug d'un événement n'ajoute plus l'année si le titre la contient déjà (« … 2026 » ne donne plus `…-2026-2026`).
+- **WhatsApp garde l'aperçu en cache par adresse** : pour un lien déjà partagé, utiliser le débogueur de partage de Facebook (« Scrape Again ») ou ajouter `?v=2` à l'adresse.
+
+## 0.13.0 — billets sans Chromium, nouveau design, visuel de partage retiré
+
+**Cassant (petit) — à répercuter dans les interfaces :**
+- `GET /public/orders/{reference}` : le champ `tickets[].shareVisualUrl` **n'existe plus**. Retirer le bouton « Partager sur WhatsApp » qui l'utilisait (ou ne partager que l'adresse de la page).
+- `GET /tickets/{ticketId}/files/{kind}` : `kind` = `pdf` ou `image` seulement ; `share` répond **422**.
+- `filesReady` vaut `true` dès que le PDF **et** l'image existent (2 fichiers par billet, au lieu de 3).
+- L'e-mail de confirmation ne joint plus que les PDF (plus de « Partage-….jpg »).
+
+**Billets : beaucoup plus rapides.** Le PDF et le PNG ne passent plus par Chromium : un dessin SVG unique (texte converti en tracés) est converti en PNG par `resvg` et en PDF par `pdfkit`. Environ 0,25 s par billet au lieu de ~1,1 s (hors lancement de Chromium, qui ajoutait ~1,5 s au premier billet et après chaque période d'inactivité sur l'hébergement à mémoire serrée), moins de 50 Mo de mémoire en plus. **L'achat n'attend plus Chromium**, qui ne sert plus qu'aux 4 rapports PDF.
+
+**Nouveau design du billet** (`TEMPLATE_VERSION` = 2) :
+- plus de « Billet d'accès », de pastille de numéro ni de QR code dans le corps du billet (le QR code reste sur la souche) ;
+- plus de logo au centre (il en reste un sur l'affiche et un sur la souche) ;
+- affiche plus étroite, avec le **titre de l'événement écrit dessus** ;
+- nom, date, heure et lieu disposent de toute la largeur centrale.
+
+**Outil d'exploitation** : `npm run db:reset` (nettoyage des données de test avant la production : à blanc par défaut, confirmation de l'hôte, verrou contre une seconde exécution ; voir `docs/DEPLOIEMENT.md`).
+
+**À savoir au déploiement :**
+- Les billets déjà émis (version 1) ne sont plus servis : la tâche de rattrapage (chaque minute, commandes payées depuis moins de 7 jours, 30 par passage) les **régénère au nouveau design**, sans renvoyer d'e-mail. Les fichiers v1 restent en stockage ; l'ancienne valeur `SHARE_VISUAL` reste dans l'énumération de la base (aucune migration).
+- Nouvelles dépendances : `@resvg/resvg-js` (binaire natif, aucune installation système), `pdfkit`, `svg-to-pdfkit`, `fontkit`. Rien à ajouter au Dockerfile.
+- Les noms contenant des caractères absents de la police (emoji, alphabets non latins) sont affichés sans ces caractères.
+
+## 0.12.0 — documents PDF de l'événement (onglet « Documents »)
+
+**Nouvelles routes** (56 au total) — *additif, rien ne casse* :
+- `GET /events/{eventId}/reports` : catalogue des 4 documents (`kind`, `title`, `description`, `formats: ["pdf"]`, `available`). `available` est `false` pour un événement en brouillon ou si le rôle n'a pas le droit.
+- `GET /events/{eventId}/reports/{kind}` : télécharge le PDF. `kind` = `participants` (Liste des participants), `ticketing` (Rapport de billetterie), `attendance` (Liste des présences), `payments` (Journal des paiements). 20 appels/min/utilisateur, `Cache-Control: private, no-store`.
+- Droits : `participants` → `participant.export` ; `attendance` → `checkin.view` ; `ticketing` et `payments` → `finance.view` ou `order.read`. Chaque téléchargement est tracé (`report.export`).
+- Erreurs : 401, 403, 404, 409 (événement en brouillon), 422 (kind inconnu, ou plus de 3 000 lignes), 429.
+
+**Notes d'exploitation** : aucune migration. Les PDF sont produits par le Chromium déjà utilisé pour les billets (Chrome ≥ 131 requis pour les en-têtes et pieds de page) ; polices Poppins ajoutées dans `assets/fonts/`. Sur Render gratuit, le premier PDF après une mise en veille peut prendre quelques secondes de plus.
+
 ## 0.11.0 — une seule section « Questions fréquentes »
 
 **Comportement modifié** — *à adapter côté front* :

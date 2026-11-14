@@ -12,13 +12,14 @@ import { OverviewModule } from './overview/overview.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { CheckinModule } from './checkin/checkin.module';
 import { ParticipantsModule } from './participants/participants.module';
+import { ReportsModule } from './reports/reports.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { SupabaseModule } from './supabase/supabase.module';
 import { TicketingModule } from './ticketing/ticketing.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
-  imports: [ConfigModule, RateLimitModule, PrismaModule, SupabaseModule, AuditModule, JobsModule, AuthModule, UsersModule, EventsModule, TicketingModule, TicketsModule, SalesModule, ParticipantsModule, OverviewModule, DashboardModule, CheckinModule],
+  imports: [ConfigModule, RateLimitModule, PrismaModule, SupabaseModule, AuditModule, JobsModule, AuthModule, UsersModule, EventsModule, TicketingModule, TicketsModule, SalesModule, ParticipantsModule, OverviewModule, DashboardModule, CheckinModule, ReportsModule],
   controllers: [HealthController],
 })
 export class AppModule {}

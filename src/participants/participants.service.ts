@@ -149,7 +149,7 @@ export class ParticipantsService {
         select: { template: true, toEmail: true, status: true, attempt: true, sentAt: true, lastEventAt: true, createdAt: true },
         orderBy: { createdAt: 'desc' }, take: 20,
       }),
-      this.prisma.generatedFile.count({ where: { ticketId, templateVersion: TEMPLATE_VERSION, kind: { in: ['TICKET_PDF', 'TICKET_IMAGE', 'SHARE_VISUAL'] } } }),
+      this.prisma.generatedFile.count({ where: { ticketId, templateVersion: TEMPLATE_VERSION, kind: { in: ['TICKET_PDF', 'TICKET_IMAGE'] } } }),
     ]);
     const payment = t.order.payments.find((p) => p.status === 'PAID') ?? t.order.payments[0];
     const name = (p: { firstName: string; lastName: string } | null) => (p ? `${p.firstName} ${p.lastName}` : null);
@@ -167,7 +167,7 @@ export class ParticipantsService {
         createdAt: t.order.createdAt, paidAt: t.order.paidAt, soldBy: name(t.order.soldBy),
       },
       emails: emails.map((e) => ({ template: e.template, toEmail: e.toEmail, status: e.status, attempt: e.attempt, sentAt: e.sentAt, lastEventAt: e.lastEventAt, createdAt: e.createdAt })),
-      filesReady: files >= 3,
+      filesReady: files >= 2,
     };
   }
 

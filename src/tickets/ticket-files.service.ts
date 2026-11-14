@@ -3,26 +3,26 @@ import { FileKind } from '@prisma/client';
 import { ENV, Env } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
 import { SupabaseAdminService } from '../supabase/supabase-admin.service';
-import { loadAssets } from './design/assets';
-import { qrSvg, ticketQrUrl } from './design/qr';
-import { shareHtml } from './design/share-html';
-import { ticketHtml } from './design/ticket-html';
+import { ticketQrUrl } from './design/qr';
 import { TicketRenderData } from './design/types';
-import { RendererService } from './renderer.service';
+import { TicketRenderer } from './ticket-renderer';
 
-/** À incrémenter quand le design change : les billets déjà générés restent valides, les nouveaux utilisent la nouvelle version. */
-export const TEMPLATE_VERSION = 1;
+/**
+ * À incrémenter quand le design change. Les fichiers d'une ancienne version restent en stockage mais ne sont plus servis :
+ * la tâche de rattrapage régénère les billets récents avec la version courante.
+ * v2 : nouveau design (sans QR ni logo redondants, titre sur l'affiche), moteur sans Chromium, plus de visuel de partage.
+ */
+export const TEMPLATE_VERSION = 2;
 
-export type FileKindParam = 'pdf' | 'image' | 'share';
+export type FileKindParam = 'pdf' | 'image';
 export const FILE_KINDS: Record<FileKindParam, { kind: FileKind; mime: string; ext: string; prefix: string }> = {
   pdf: { kind: 'TICKET_PDF', mime: 'application/pdf', ext: 'pdf', prefix: 'Billet' },
   image: { kind: 'TICKET_IMAGE', mime: 'image/png', ext: 'png', prefix: 'Billet' },
-  share: { kind: 'SHARE_VISUAL', mime: 'image/jpeg', ext: 'jpg', prefix: 'Partage' },
 };
 const SIGNED_TTL = 900;                // 15 min
 const MAX_POSTER_BYTES = 4 * 1024 * 1024;
 
-export interface TicketUrls { pdfUrl: string; imageUrl: string; shareVisualUrl: string }
+export interface TicketUrls { pdfUrl: string; imageUrl: string }
 
 @Injectable()
 export class TicketFilesService {
@@ -32,7 +32,7 @@ export class TicketFilesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly supabase: SupabaseAdminService,
-    private readonly renderer: RendererService,
+    private readonly renderer: TicketRenderer,
     @Inject(ENV) private readonly env: Env,
   ) {}
 
@@ -46,9 +46,7 @@ export class TicketFilesService {
     });
     if (!t) return { generated: 0 };
     const have = new Set((await this.prisma.generatedFile.findMany({ where: { ticketId, templateVersion: TEMPLATE_VERSION }, select: { kind: true } })).map((f) => f.kind));
-    const needTicket = !have.has('TICKET_PDF') || !have.has('TICKET_IMAGE');
-    const needShare = !have.has('SHARE_VISUAL');
-    if (!needTicket && !needShare) return { generated: 0 };
+    if (have.has('TICKET_PDF') && have.has('TICKET_IMAGE')) return { generated: 0 };
 
     const base = this.env.TICKET_QR_BASE_URL ?? `${this.env.PUBLIC_WEB_URL}/billet`;
     const data: TicketRenderData = {
@@ -62,7 +60,6 @@ export class TicketFilesService {
       },
       posterDataUri: await this.loadPoster(t.event.posters[0]),
     };
-    const assets = loadAssets();
     const rows: { kind: FileKind; storagePath: string; mime: string; sizeBytes: number }[] = [];
     const dir = `${t.eventId}/${t.id}`;
     const put = async (key: FileKindParam, buf: Buffer) => {
@@ -73,11 +70,8 @@ export class TicketFilesService {
       rows.push({ kind: k.kind, storagePath, mime: k.mime, sizeBytes: buf.length });
     };
 
-    if (needTicket) {
-      const r = await this.renderer.renderTicket(ticketHtml(data, assets, await qrSvg(data.qrUrl)));
-      await put('pdf', r.pdf); await put('image', r.png);
-    }
-    if (needShare) await put('share', await this.renderer.renderShare(shareHtml(data, assets)));
+    const r = await this.renderer.render(data);
+    await put('pdf', r.pdf); await put('image', r.png);
 
     await this.prisma.generatedFile.createMany({
       data: rows.map((r) => ({ kind: r.kind, ticketId, eventId: t.eventId, bucket: this.env.TICKETS_BUCKET, storagePath: r.storagePath, mime: r.mime, sizeBytes: r.sizeBytes, templateVersion: TEMPLATE_VERSION })),
@@ -130,7 +124,7 @@ export class TicketFilesService {
     return { url: data.signedUrl, expiresAt: new Date(exp), fileName, contentType: k.mime };
   }
 
-  /** Pour la page de suivi de l'acheteur : les 3 liens de chaque billet, ou null tant que tout n'est pas généré. */
+  /** Pour la page de suivi de l'acheteur : les 2 liens de chaque billet, ou null tant que tout n'est pas généré. */
   async urlsFor(tickets: { id: string; number: string }[]): Promise<Map<string, TicketUrls>> {
     const out = new Map<string, TicketUrls>();
     if (!tickets.length) return out;
@@ -139,9 +133,9 @@ export class TicketFilesService {
     for (const r of rows) (kinds.get(r.ticketId!) ?? kinds.set(r.ticketId!, new Set()).get(r.ticketId!)!).add(r.kind);
     for (const t of tickets) {
       const k = kinds.get(t.id);
-      if (!k || !k.has('TICKET_PDF') || !k.has('TICKET_IMAGE') || !k.has('SHARE_VISUAL')) continue;
-      const [pdf, image, share] = await Promise.all((['pdf', 'image', 'share'] as const).map((x) => this.signedUrl(t.id, x, t.number)));
-      if (pdf && image && share) out.set(t.id, { pdfUrl: pdf.url, imageUrl: image.url, shareVisualUrl: share.url });
+      if (!k || !k.has('TICKET_PDF') || !k.has('TICKET_IMAGE')) continue;
+      const [pdf, image] = await Promise.all((['pdf', 'image'] as const).map((x) => this.signedUrl(t.id, x, t.number)));
+      if (pdf && image) out.set(t.id, { pdfUrl: pdf.url, imageUrl: image.url });
     }
     return out;
   }

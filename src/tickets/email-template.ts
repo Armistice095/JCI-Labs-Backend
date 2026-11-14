@@ -10,7 +10,6 @@ export interface TicketEmailInput {
   orderUrl: string | null;      // page « Mes billets » (jeton de suivi de la commande)
   logoUrl: string;
   pdfAttached: boolean;
-  shareAttached: boolean;
 }
 
 /** E-mail de confirmation (MJML → HTML responsive). Toutes les valeurs dynamiques sont échappées. */
@@ -75,7 +74,7 @@ export function buildTicketEmail(i: TicketEmailInput): { subject: string; html: 
     </mj-section>
     <mj-section background-color="#FFFFFF" padding="6px 28px 6px">
       <mj-column background-color="#FFF8E8" border="1.5px solid #F2D28A" border-radius="14px" padding="12px 18px">
-        <mj-text font-size="13.5px" line-height="21px" padding="0"><b>À l’entrée :</b> présentez le QR code de votre billet (sur téléphone ou imprimé). Chaque billet est <b>personnel</b>, <b>non transférable</b> et ne peut être utilisé <b>qu’une seule fois</b>.${i.shareAttached ? '<br/><b>Partagez votre venue !</b> Le visuel « J’y serai ! » est joint : enregistrez-le et publiez-le sur votre statut WhatsApp ou Facebook.' : ''}</mj-text>
+        <mj-text font-size="13.5px" line-height="21px" padding="0"><b>À l’entrée :</b> présentez le QR code de votre billet (sur téléphone ou imprimé). Chaque billet est <b>personnel</b>, <b>non transférable</b> et ne peut être utilisé <b>qu’une seule fois</b>.</mj-text>
       </mj-column>
     </mj-section>
     <mj-section background-color="#FFFFFF" padding="10px 28px 24px">

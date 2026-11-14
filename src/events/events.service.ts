@@ -257,7 +257,10 @@ export class EventsService {
   }
 
   private async uniqueSlug(title: string, date?: string): Promise<string> {
-    const base = [slugify(title, 50), date?.slice(0, 4)].filter(Boolean).join('-');
+    const year = date?.slice(0, 4);
+    const slug = slugify(title, 50);
+    // pas d'année en double quand le titre la contient déjà (« Passation de charge 2026 » → …-2026, pas …-2026-2026)
+    const base = [slug, year && !new RegExp(`(^|-)${year}$`).test(slug) ? year : ''].filter(Boolean).join('-');
     let candidate = base;
     for (let i = 0; i < 5; i++) {
       if (!(await this.prisma.event.findUnique({ where: { slug: candidate }, select: { id: true } }))) return candidate;

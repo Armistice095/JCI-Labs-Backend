@@ -97,7 +97,11 @@ export class PublicEventsService {
       og: {
         title: e.title,
         description: e.description.length > 200 ? `${e.description.slice(0, 197)}…` : e.description,
-        imageUrl: cover ? posterUrl(this.env, cover.storagePath) : null,
+        // Variante légère 1200×630 si elle existe (les aperçus WhatsApp/Facebook ignorent les images lourdes), sinon l'affiche d'origine.
+        imageUrl: cover ? posterUrl(this.env, cover.sharePath ?? cover.storagePath) : null,
+        imageWidth: cover ? (cover.sharePath ? 1200 : cover.width) : null,
+        imageHeight: cover ? (cover.sharePath ? 630 : cover.height) : null,
+        imageType: cover ? (cover.sharePath ? 'image/jpeg' : cover.mime) : null,
       },
     };
   }

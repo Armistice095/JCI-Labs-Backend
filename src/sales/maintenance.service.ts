@@ -59,7 +59,7 @@ export class MaintenanceService {
         AND o.paid_at < ${new Date(now.getTime() - 3 * 60_000)} AND o.paid_at > ${new Date(now.getTime() - 7 * 86_400_000)}
         AND (
           (SELECT count(*) FROM generated_files g JOIN tickets t ON t.id = g.ticket_id WHERE t.order_id = o.id AND g.template_version = ${TEMPLATE_VERSION})
-            < 3 * (SELECT count(*) FROM tickets t WHERE t.order_id = o.id)
+            < 2 * (SELECT count(*) FROM tickets t WHERE t.order_id = o.id)
           OR (o.send_tickets_email AND o.buyer_email IS NOT NULL AND NOT EXISTS (
                 SELECT 1 FROM email_logs e WHERE e.order_id = o.id AND e.template = 'TICKET_CONFIRMATION'
                   AND (e.status NOT IN ('QUEUED','FAILED') OR e.attempt >= 12)))

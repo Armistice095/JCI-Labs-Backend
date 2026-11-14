@@ -1,7 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { existsSync } from 'node:fs';
 import puppeteer, { Browser, Page } from 'puppeteer-core';
-import { SHARE_H, SHARE_W, TICKET_H, TICKET_W } from './design/types';
 
 const CANDIDATES: Record<string, string[]> = {
   linux: ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome-stable', '/usr/bin/google-chrome'],
@@ -31,10 +30,8 @@ const LOW_MEMORY_ARGS = [
   '--js-flags=--max-old-space-size=128',
 ];
 
-export interface RenderedTicket { pdf: Buffer; png: Buffer }
-
 /**
- * Rend du HTML en PDF/PNG/JPEG avec Chromium. Un navigateur partagé, au plus `maxPages` rendus simultanés.
+ * Rend du HTML en PDF avec Chromium (rapports de l'événement ; les billets, eux, n'utilisent plus de navigateur : voir ticket-renderer.ts). Un navigateur partagé, au plus `maxPages` rendus simultanés.
  * Sécurité : le HTML ne contient aucun script ; toute requête réseau est refusée (seules les data-URI passent).
  */
 export class ChromiumRenderer {
@@ -92,19 +89,12 @@ export class ChromiumRenderer {
     });
   }
 
-  /** Billet : PDF (297 × 99,5 mm, texte et QR vectoriels) + PNG haute définition (2×), à partir du même HTML. */
-  async renderTicket(html: string): Promise<RenderedTicket> {
-    return this.withPage(TICKET_W, TICKET_H, 2, html, async (page) => {
-      const png = Buffer.from(await page.screenshot({ type: 'png', clip: { x: 0, y: 0, width: TICKET_W, height: TICKET_H } }));
-      const pdf = Buffer.from(await page.pdf({ width: `${TICKET_W}px`, height: `${TICKET_H}px`, printBackground: true, preferCSSPageSize: true, pageRanges: '1' }));
-      return { pdf, png };
-    });
-  }
-
-  /** Visuel de partage (1080 × 1920) en JPEG : léger, accepté partout (statut WhatsApp, Facebook). */
-  async renderShare(html: string): Promise<Buffer> {
-    return this.withPage(SHARE_W, SHARE_H, 1, html, async (page) =>
-      Buffer.from(await page.screenshot({ type: 'jpeg', quality: 90, clip: { x: 0, y: 0, width: SHARE_W, height: SHARE_H } })));
+  /**
+   * Rapport PDF au format A4 : la mise en page (couverture sans marges, en-têtes, pieds de page, numéros de page) est décrite par le CSS du document (@page).
+   * Garde-fous : aucun script, aucune requête réseau.
+   */
+  async renderPdf(html: string): Promise<Buffer> {
+    return this.withPage(794, 1123, 1, html, async (page) => Buffer.from(await page.pdf({ preferCSSPageSize: true, printBackground: true, timeout: 120_000 })));
   }
 
   /** Hébergement à mémoire serrée : Chromium s'éteint quand plus rien n'est à rendre et redémarre au rendu suivant (~1 s). */

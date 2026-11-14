@@ -294,6 +294,7 @@ model EventPoster {
   id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   eventId     String  @map("event_id") @db.Uuid
   storagePath String  @map("storage_path") // bucket public "event-posters"
+  sharePath   String? @map("share_path") // variante légère 1200×630 (JPEG) pour l'aperçu des liens partagés ; null = pas encore générée
   mime        String
   sizeBytes   Int     @map("size_bytes")
   width       Int?

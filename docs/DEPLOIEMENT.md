@@ -9,7 +9,7 @@
 | Limite | Conséquence |
 |---|---|
 | Le service **s'endort après 15 min sans trafic** ; ~1 min pour se réveiller | La première requête après une pause est lente. Les tâches de fond sont aussi à l'arrêt pendant le sommeil. |
-| **512 Mo de mémoire** | Node (~210 Mo) + Chromium pendant la génération d'un billet (~270 Mo en mode faible mémoire) : **ça passe de justesse**. À tester dès le premier déploiement (étape 6). |
+| **512 Mo de mémoire** | Node (~210 Mo) ; les billets n'ajoutent presque rien (pas de navigateur). Chromium (~270 Mo en mode faible mémoire) n'est lancé que pour un rapport PDF de l'événement : **ça passe**, mais éviter de télécharger plusieurs rapports en même temps. À tester dès le premier déploiement (étape 6). |
 | Pas de shell, disque éphémère, pas de `preDeployCommand` | Les **migrations se lancent depuis votre poste** (étape 2). Tous les fichiers sont dans Supabase Storage, rien n'est perdu au redémarrage. |
 | Usage non destiné à la production (selon Render) | Parfait pour la recette ; pour la **vraie vente de billets**, passer à un hébergement qui reste allumé (voir « Passer en production »). |
 
@@ -106,6 +106,26 @@ Le dépôt peut être **privé** : Render s'y connecte via son application GitHu
 - **Garder le service éveillé** (facultatif, recette seulement) : un moniteur gratuit (UptimeRobot, toutes les 5 minutes) sur `/api/v1/health` évite le sommeil. Les 750 heures mensuelles couvrent un service allumé en permanence (744 h dans un mois de 31 jours), mais Render déconseille cet usage pour la production.
 - **Supabase gratuit** : un projet sans activité pendant **une semaine** est mis en pause (base et authentification indisponibles) ; il se rétablit depuis le tableau de bord. Un service allumé en continu l'évite. Limites : 500 Mo de base, 1 Go de fichiers (affiches et billets), 5 Go de transfert par mois. Vérifier la politique de sauvegarde de votre plan et, sur le plan gratuit, prévoir un export régulier de la base.
 
+## Nettoyer les données de test avant l'ouverture
+
+À faire **une seule fois**, depuis votre poste (le `.env` doit pointer vers la base à nettoyer). Le script `scripts/reset-test-data.ts` supprime les ventes de test, remet les numéros à zéro (prochain billet `…-000001`, prochaine commande `CMD-0001`) et vide les fichiers de billets. Il **ne touche pas** aux rôles, permissions, paramètres ni aux administrateurs conservés.
+
+```bash
+# 0. (recommandé) sauvegarde, si pg_dump est installé
+pg_dump "$DIRECT_URL" -Fc -f sauvegarde-avant-nettoyage.dump
+# 1. mettre le schéma à jour (sans effet s'il l'est déjà)
+npm install && npm run prisma:migrate && npm run db:sql
+# 2. exécution À BLANC : n'écrit rien, affiche ce qui serait supprimé et l'hôte de la base
+npm run db:reset -- --scope=all
+# 3. pour de vrai : recopier la commande affichée à l'étape 2 (elle contient --confirm-host=<hôte>)
+npm run db:reset -- --scope=all --apply --confirm-host=<hôte>
+```
+
+- `--scope=sales` garde les événements (et leurs catégories, affiches) ; `--scope=all` supprime aussi tous les événements.
+- `--remove-members=a@x.bj,b@y.bj` supprime aussi des comptes de test (profil + compte Supabase). Refusé s'il ne resterait aucun administrateur actif.
+- Suspendre le service Render pendant l'opération (Settings → Suspend), puis le reprendre : plus aucune écriture ne s'intercale.
+- Garde-fou : après un nettoyage réel, le script refuse de tourner à nouveau sans `--allow-repeat`, pour qu'une fausse manœuvre ne détruise jamais de vraies ventes.
+
 ## Passer en production (avant le premier vrai événement)
 
 | À faire | Pourquoi |
@@ -126,7 +146,7 @@ Le dépôt peut être **privé** : Render s'y connecte via son application GitHu
 | Le déploiement échoue, journaux : `Configuration invalide : - XXX: …` | Variable d'environnement manquante ou mal formée | Render → Environment, corriger la variable citée |
 | `ENETUNREACH` ou `ECONNREFUSED` vers la base | `DIRECT_URL` pointe vers `db.xxxx.supabase.co` (IPv6) | Utiliser les adresses du **pooler** (étape 1) |
 | Migrations qui échouent ou file de tâches instable | `DIRECT_URL` utilise le pooler **transaction** (port 6543) | Mettre le pooler **session** (port 5432) |
-| Déploiement « Live » puis `Out of memory (used over 512Mi)` pendant un achat | Chromium + Node dépassent 512 Mo | Vérifier `CHROMIUM_LOW_MEMORY=true` et `NODE_OPTIONS`. Si cela persiste : plan Render payant ou serveur plus grand. La tâche de rattrapage régénère les billets manquants chaque minute, rien n'est perdu. |
+| Déploiement « Live » puis `Out of memory (used over 512Mi)` pendant le téléchargement d'un rapport PDF | Chromium + Node dépassent 512 Mo | Vérifier `CHROMIUM_LOW_MEMORY=true` et `NODE_OPTIONS`. Si cela persiste : plan Render payant ou serveur plus grand. Un achat n'est pas concerné : les billets se génèrent sans Chromium. |
 | Les appels du front échouent avec « CORS policy » | `CORS_ORIGINS` incomplet | Ajouter l'adresse exacte du front (schéma `https://`, sans `/` final) |
 | Le front affiche « Connexion impossible » sans erreur CORS | Politique CSP du front (`connect-src`) qui n'autorise pas l'adresse de l'API | Corriger la CSP du front |
 | Le webhook FedaPay répond 401 | `FEDAPAY_WEBHOOK_SECRET` ne correspond pas au secret du webhook | Recopier le secret de signature affiché par FedaPay |
